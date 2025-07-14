@@ -1,0 +1,35 @@
+# Build results
+bin/
+obj/
+*.exe
+*.dll
+*.log
+*.cache
+*.user
+*.suo
+*.vsidx
+
+# Visual Studio
+.vs/
+
+# VS Code
+.vscode/
+
+# OS junk
+Thumbs.db
+.DS_Store
+
+# Rider
+.idea/
+
+# node/npm
+node_modules/
+
+# dotenv
+.env
+
+# Archives
+*.zip
+*.tar
+*.rar
+*.7z
