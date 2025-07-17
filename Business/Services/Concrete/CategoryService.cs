@@ -25,6 +25,7 @@ public class CategoryService : BaseService, ICategoryService
     {
         _categoryRepo = categoryRepo;
     }
+
     public async Task<IResult> CreateCategoryAsync(CategoryViewModel model)
     {
         if (await _categoryRepo.ExistsAsync(c => c.Name.ToLower() == model.Name.ToLower() && !c.IsDeleted))
@@ -34,6 +35,30 @@ public class CategoryService : BaseService, ICategoryService
         return createResult > 0
             ? new SuccessResult(Messages.CreateSuccess)
             : new ErrorResult(Messages.CreateError);
+    }
+
+    public async Task<IResult> UpdateCategoryAsync(CategoryViewModel model)
+    {
+        var existingCategory = await _categoryRepo.GetByIdAsync(model.Id);
+
+        if (existingCategory == null || existingCategory.IsDeleted)
+            return new ErrorResult(Messages.CategoryNotFound);
+
+        var isNameTaken = await _categoryRepo.ExistsAsync(c =>
+        c.Name.ToLower() == model.Name.ToLower() &&
+        c.Id != model.Id && !c.IsDeleted);
+
+        if (isNameTaken)
+            return new ErrorResult(Messages.AlreadyExists);
+
+        existingCategory.Name = model.Name;
+        existingCategory.ImageUrl = model.ImageUrl;
+
+        var updateResult = await _categoryRepo.UpdateAsync(existingCategory);
+
+        return updateResult > 0
+            ? new SuccessResult(Messages.UpdateSuccess)
+            : new ErrorResult(Messages.UpdateError);
     }
 
     public async Task<IResult> DeleteCategoryAsync(Guid categoryId)

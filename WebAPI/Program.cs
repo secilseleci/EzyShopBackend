@@ -5,6 +5,11 @@ using DataAccess.SeedDatabase;
 using Microsoft.EntityFrameworkCore;   // eski adý buysa, namespace’i güncelle
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appsettings.json", optional: false)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true)
+    .AddEnvironmentVariables();
 
 // ---------- 1) DI BLOKU ----------
 builder.Services.AddHttpContextAccessor();
@@ -27,6 +32,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();

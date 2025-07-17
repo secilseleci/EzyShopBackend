@@ -29,7 +29,7 @@ public class ApplicationDbContext(
         var now = DateTime.UtcNow;
         var userName = httpContextAccessor?.HttpContext?.User?.Identity?.IsAuthenticated == true
             ? httpContextAccessor.HttpContext.User.Identity.Name
-            : null;
+            : "test-user";
 
         foreach (var entry in ChangeTracker.Entries<IAuditable>())
         {
