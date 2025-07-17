@@ -41,4 +41,11 @@ public class CategoryApiController:BaseApiController
         var result = await _categoryService.DeleteCategoryAsync(id);
         return ApiResult(result);
     }
+
+    [HttpPut]
+    public async Task<IActionResult> Update([FromBody] CategoryViewModel model)
+    {
+        var result = await _categoryService.UpdateCategoryAsync(model);
+        return ApiResult(result);
+    }
 }
