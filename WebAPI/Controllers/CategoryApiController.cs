@@ -1,15 +1,16 @@
-﻿using Business.Services.Abstract;
-using Business.Services.Concrete;
+﻿using AutoMapper;
+using Business.Services.Abstract;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Models.ViewModels.Category;
 
 namespace WebAPI.Controllers;
 [ApiController]
 [Route("api/categories")]
-public class CategoryApiController:BaseApiController
+public class CategoryApiController : BaseApiController
 {
     private readonly ICategoryService _categoryService;
-    public CategoryApiController(ICategoryService categoryService)
+    public CategoryApiController(ICategoryService categoryService, IMapper mapper) : base(mapper)
     {
         _categoryService = categoryService;
     }
@@ -29,13 +30,15 @@ public class CategoryApiController:BaseApiController
     }
 
     [HttpPost]
-    public async Task<IActionResult> Add([FromBody]CategoryViewModel model)
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Add([FromBody] CategoryViewModel model)
     {
         var result = await _categoryService.CreateCategoryAsync(model);
         return ApiResult(result);
     }
 
     [HttpDelete]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete([FromBody] Guid id)
     {
         var result = await _categoryService.DeleteCategoryAsync(id);
@@ -43,6 +46,7 @@ public class CategoryApiController:BaseApiController
     }
 
     [HttpPut]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update([FromBody] CategoryViewModel model)
     {
         var result = await _categoryService.UpdateCategoryAsync(model);

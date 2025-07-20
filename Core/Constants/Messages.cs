@@ -46,7 +46,6 @@
         #region Login / Logout Messages
         public const string LoginSuccess = "Login successfull.";
         public const string LoginInvalidCredentials = "Email or password is incorrect.";
-        public const string LoginUserNotFound = "User not found.";
         public const string LogoutSuccess = "Logout successfull.";
         public const string LoginUnauthorized = "Please log in to perform this operation.";
 

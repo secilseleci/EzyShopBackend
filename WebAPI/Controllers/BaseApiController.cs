@@ -1,4 +1,5 @@
-﻿using Core.Constants;
+﻿using AutoMapper;
+using Core.Constants;
 using Core.Utilities.Results;
 using Microsoft.AspNetCore.Mvc;
 using IResult = Core.Utilities.Results.IResult;
@@ -7,8 +8,13 @@ namespace WebAPI.Controllers;
 
 [ApiController]
 public class BaseApiController : ControllerBase
-
 {
+    protected readonly IMapper Mapper;
+    public BaseApiController(IMapper mapper)
+    {
+        Mapper = mapper;
+    }
+
     protected IActionResult ApiResult(IResult result)
     {
         if (result == null)
