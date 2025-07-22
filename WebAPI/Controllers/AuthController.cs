@@ -106,10 +106,15 @@ public class AuthController : BaseApiController
             return BadRequest(new { Errors = errors });
         }
 
-        // 5. Güvenlik damgası güncellenir (token refresh)
-        await UserManager.UpdateSecurityStampAsync(user);
+        // 5. Şifre başarıyla değiştiyse yeni token üret:
+        var roles = await UserManager.GetRolesAsync(user);
+        var newToken = _tokenService.CreateToken(user, roles);
 
-        return Ok(new { Message = Messages.PasswordChangeSuccess });
+        return Ok(new
+        {
+            Message = Messages.PasswordChangeSuccess,
+            NewToken = newToken
+        });
     }
 }
 
