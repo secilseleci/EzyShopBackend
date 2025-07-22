@@ -20,7 +20,7 @@ builder.Services.ConfigureServiceRegistration();
 builder.Services.AddAutoMapper(typeof(Program));
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.ConfigureSwaggerWithJwt();
 builder.Services.ConfigureJwtAuthentication(builder.Configuration);
 
 // ---------- 2) APP BLOKU ----------

@@ -22,8 +22,8 @@ public class TokenService : ITokenService
         var authClaims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.UserName),
-            new Claim(ClaimTypes.Email, user.Email),
+            new Claim(ClaimTypes.Name, user.UserName!),
+            new Claim(ClaimTypes.Email, user.Email!),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         }; 
         
@@ -31,8 +31,11 @@ public class TokenService : ITokenService
         {
             authClaims.Add(new Claim(ClaimTypes.Role, role));
         }
+        var key = _config["Jwt:Key"];
+        if (string.IsNullOrWhiteSpace(key))
+            throw new InvalidOperationException("JWT key is not configured.");
 
-        var authKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
+        var authKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],
             audience: _config["Jwt:Audience"],

@@ -17,8 +17,10 @@ public class CurrentUserService : ICurrentUserService
         if (user?.Identity?.IsAuthenticated ?? false)
         {
             UserId = Guid.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : null;
-            UserName = user.Identity.Name;
-            Role=user.FindFirst(ClaimTypes.Role)?.Value;
+            UserName =
+                           user.FindFirst(ClaimTypes.Name)?.Value
+                           ?? user.FindFirst(ClaimTypes.Email)?.Value;
+            Role =user.FindFirst(ClaimTypes.Role)?.Value;
         }
     }
 }

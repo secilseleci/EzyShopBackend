@@ -1,9 +1,8 @@
-﻿using System.ComponentModel;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
-namespace Models.ViewModels.Auth;
+namespace Models.DTOs.Auth;
 
-public class ChangePasswordViewModel
+public class ChangePasswordDto
 {
     [Required]
     [DataType(DataType.Password)]
@@ -23,7 +22,4 @@ public class ChangePasswordViewModel
     [Display(Name = "Confirm New Password")]
     [MinLength(6)]
     public string ConfirmNewPassword { get; set; } = null!;
-
- 
-
 }
