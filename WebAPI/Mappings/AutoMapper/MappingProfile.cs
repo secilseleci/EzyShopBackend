@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Models.DTOs.Auth;
 using Models.Entities.Concrete;
 using Models.ViewModels.Auth;
 using Models.ViewModels.Category;
@@ -37,7 +38,7 @@ public class MappingProfile : Profile
         #endregion
 
         #region Customer for Register
-        CreateMap<RegisterCustomerViewModel, Customer>()
+        CreateMap<RegisterCustomerDto, Customer>()
         .AfterMap((src, dest) =>
         {
             var names = src.FullName.Split(' ');
@@ -46,7 +47,7 @@ public class MappingProfile : Profile
                             ? string.Join(" ", names.Skip(1))
                             : "";
         });
-        CreateMap<Customer, RegisterCustomerViewModel>()
+        CreateMap<Customer, RegisterCustomerDto>()
         .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => $"{src.FirstName} {src.LastName}".Trim()));
         #endregion
 

@@ -83,11 +83,12 @@ public class BaseRepository<T> : IBaseRepository<T> where T:class, IBaseEntity, 
     {
         return await _dbSet.AnyAsync(predicate);
     }
-    
+
     public async Task<IDbContextTransaction> BeginTransactionAsync()
     {
         return await _dataContext.Database.BeginTransactionAsync();
     }
+
     public async Task<PaginatedList<TResult>> GetPaginatedAsync<TResult>(
         IQueryable<TResult> query,
         int page, int pageSize)

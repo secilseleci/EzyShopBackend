@@ -7,9 +7,9 @@ using Core.Utilities.Results;
 using DataAccess.Repositories.Abstract;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
+using Models.DTOs.Auth;
 using Models.Entities.Concrete;
 using Models.Identity;
-using Models.ViewModels.Auth;
 using Models.ViewModels.Customer;
 
 namespace Business.Services.Concrete;
@@ -17,6 +17,8 @@ namespace Business.Services.Concrete;
 public class CustomerService : BaseService, ICustomerService
 {
     private readonly ICustomerRepository _customerRepo;
+    private readonly UserManager<AppUser> _userManager;
+    private readonly RoleManager<AppRole> _roleManager;
     public CustomerService(
       IMapper mapper,
       IConfiguration config,
@@ -27,28 +29,65 @@ public class CustomerService : BaseService, ICustomerService
    : base(mapper, config, currentUserService)
     {
         _customerRepo = customerRepo;
+        _userManager = userManager;
+        _roleManager = roleManager;
     }
 
-    public async Task<decimal> CountAsync()
+
+    public async Task<IResult> RegisterCustomerAsync(RegisterCustomerDto model)
     {
-        return await _customerRepo.CountAsync();
-    }
-    public async Task<IResult> CreateCustomerAsync(Guid userId, RegisterCustomerViewModel model)
-    {
-        var existingCustomer = await _customerRepo.GetByIdAsync(userId);
+        // 1. AppUser kontrolü
+        var existingUser = await _userManager.FindByEmailAsync(model.Email);
+        if (existingUser != null && !existingUser.IsDeleted)
+            return new ErrorResult(Messages.AlreadyExistsEmail);
+
+        // 2. AppUser oluşturma
+        var user = new AppUser
+        {
+            Email = model.Email,
+            UserName = model.Email,
+            PhoneNumber = model.Phone,
+            EmailConfirmed = true
+        };
+
+        var createUserResult = await _userManager.CreateAsync(user, model.Password);
+        if (!createUserResult.Succeeded)
+        {
+            var errors = string.Join(" | ", createUserResult.Errors.Select(e => e.Description));
+            return new ErrorResult(errors);
+        }
+
+        // 3. Rol kontrol & atama
+        if (!await _roleManager.RoleExistsAsync(CustomRoles.Customer))
+            await _roleManager.CreateAsync(new AppRole { Name = CustomRoles.Customer });
+
+        await _userManager.AddToRoleAsync(user, CustomRoles.Customer);
+
+        // 4. Customer kontrol
+        var existingCustomer = await _customerRepo.GetByIdAsync(user.Id);
         if (existingCustomer != null)
         {
+            await _userManager.DeleteAsync(user); // AppUser'ı manuel sil
             return new ErrorResult(Messages.AlreadyExistsCustomer);
         }
 
+        // 5. Customer oluşturma
         var customer = Mapper.Map<Customer>(model);
-        customer.Id = userId;
+        customer.Id = user.Id;
         customer.CreatedBy = model.FullName;
 
         var createResult = await _customerRepo.CreateAsync(customer);
-        return createResult > 0
-            ? new SuccessResult(Messages.CreateSuccess)
-            : new ErrorResult(Messages.CreateError);
+        if (createResult <= 0)
+        {
+            await _userManager.DeleteAsync(user); // AppUser'ı manuel silme
+            return new ErrorResult(Messages.CreateError);
+        }
+
+        return new SuccessResult(Messages.CreateSuccess);
+    }
+    public async Task<decimal> CountAsync()
+    {
+        return await _customerRepo.CountAsync();
     }
     public async Task<IResult> DeleteCustomerAsync(Guid customerId)
     {

@@ -15,13 +15,13 @@ public interface IBaseRepository<T> where T : class, IBaseEntity, IAuditable
     Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate);
     Task<IDbContextTransaction> BeginTransactionAsync();
     Task<PaginatedList<TResult>> GetPaginatedAsync<TResult>(IQueryable<TResult> query, int page, int pageSize);
-     
+
     Task<int> CreateAsync(T entity);
     Task<int> CreateRangeAsync(IEnumerable<T> entities);
 
     Task<int> SoftDeleteAsync(Guid Id);
     Task<int> SoftDeleteRangeAsync(IEnumerable<T> entities);
-  
+
     Task<int> UpdateAsync(T entity);
     Task<int> UpdateRangeAsync(IEnumerable<T> entities);
 }
