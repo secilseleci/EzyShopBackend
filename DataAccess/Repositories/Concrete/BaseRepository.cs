@@ -18,6 +18,10 @@ public class BaseRepository<T> : IBaseRepository<T> where T:class, IBaseEntity, 
         _dataContext = context;
         _dbSet = _dataContext.Set<T>();
     }
+    public async Task<IDbContextTransaction> BeginTransactionAsync()
+    {
+        return await _dataContext.Database.BeginTransactionAsync();
+    }
     public async Task<int> CreateAsync(T entity)
     {
         await _dbSet.AddAsync(entity);
@@ -84,10 +88,7 @@ public class BaseRepository<T> : IBaseRepository<T> where T:class, IBaseEntity, 
         return await _dbSet.AnyAsync(predicate);
     }
 
-    public async Task<IDbContextTransaction> BeginTransactionAsync()
-    {
-        return await _dataContext.Database.BeginTransactionAsync();
-    }
+   
 
     public async Task<PaginatedList<TResult>> GetPaginatedAsync<TResult>(
         IQueryable<TResult> query,

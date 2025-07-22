@@ -14,6 +14,19 @@ public class ApplicationDbContext(
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<Product>()
+            .Property(p => p.Price)
+            .HasPrecision(18, 2);
+
+        modelBuilder.Entity<OrderItem>()
+            .Property(p => p.ProductPrice)
+            .HasPrecision(18, 2);
+
+        modelBuilder.Entity<Order>()
+            .Property(p => p.TotalAmount)
+            .HasPrecision(18, 2);
+
     }
 
     public DbSet<Category> Categories { get; set; }

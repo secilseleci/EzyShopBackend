@@ -14,7 +14,7 @@ public class MappingProfile : Profile
     public MappingProfile()
     {
         #region Seller for Register
-        CreateMap<RegisterSellerViewModel, Seller>()
+        CreateMap<RegisterSellerDto, Seller>()
             .AfterMap((src, dest) =>
          {
              var names = src.FullName.Split(' ');
@@ -25,8 +25,12 @@ public class MappingProfile : Profile
          });
 
 
-        CreateMap<Seller, RegisterSellerViewModel>()
+        CreateMap<Seller, RegisterSellerDto>()
             .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => $"{src.FirstName} {src.LastName}".Trim()));
+
+
+        CreateMap<RegisterSellerDto, Shop>()
+    .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.ShopName));
 
         #endregion
 
@@ -58,9 +62,9 @@ public class MappingProfile : Profile
 
         #region Product 
         CreateMap<CreateProductViewModel, Product>();
-      
-       CreateMap<Product, UpdateProductViewModel>().ReverseMap();
-  #endregion
+
+        CreateMap<Product, UpdateProductViewModel>().ReverseMap();
+        #endregion
         //CreateMap<Product, ProductSellerViewModel>();
 
         //CreateMap<Product, ProductCustomerViewModel>();

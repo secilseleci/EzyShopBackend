@@ -15,6 +15,7 @@ namespace WebAPI.Controllers;
 
 public class AuthController : BaseApiController
 {
+    private readonly ISellerService _sellerService;
     private readonly ICustomerService _customerService;
     protected readonly UserManager<AppUser> UserManager;
     protected readonly SignInManager<AppUser> SignInManager;
@@ -22,7 +23,8 @@ public class AuthController : BaseApiController
     private readonly ICurrentUserService _currentUserService;
     private readonly ITokenService _tokenService;
     public AuthController(
-        ICustomerService customerService,
+     ISellerService sellerService,
+     ICustomerService customerService,
      UserManager<AppUser> userManager,
      SignInManager<AppUser> signInManager,
      RoleManager<AppRole> roleManager,
@@ -37,6 +39,7 @@ public class AuthController : BaseApiController
         _tokenService = tokenService;
         _customerService = customerService;
         _currentUserService = currentUserService;
+        _sellerService = sellerService;
     }
 
     [HttpPost("login")]
@@ -76,6 +79,16 @@ public class AuthController : BaseApiController
         return ApiResult(result);
     }
 
+    [HttpPost("register-seller")]
+    public async Task<IActionResult> RegisterSeller([FromBody] RegisterSellerDto model)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var result = await _sellerService.CreateSellerApplicationAsync(model);
+
+        return ApiResult(result);
+    }
     [Authorize]
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto model)
