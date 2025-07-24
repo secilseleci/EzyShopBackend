@@ -3,6 +3,7 @@ using Core.Pagination;
 using DataAccess.Repositories.Abstract;
 using Microsoft.EntityFrameworkCore;
 using Models.DTOs;
+using Models.DTOs.Shop;
 using Models.Entities.Concrete;
 using System.Linq.Expressions;
 

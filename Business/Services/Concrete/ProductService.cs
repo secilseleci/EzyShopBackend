@@ -5,12 +5,12 @@ using Core.Interfaces;
 using Core.Pagination;
 using Core.Utilities.Results;
 using DataAccess.Repositories.Abstract;
+using DataAccess.Repositories.Concrete;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
-using Models.DTOs;
+using Models.DTOs.Product;
 using Models.Entities.Concrete;
 using Models.Identity;
-using Models.ViewModels.Product;
 
 namespace Business.Services.Concrete;
 
@@ -38,7 +38,7 @@ public class ProductService : BaseService, IProductService
     }
 
     #region Seller
-    public async Task<IResult> CreateProductAsync(CreateProductViewModel model)
+    public async Task<IResult> CreateProductAsync(CreateProductDto model)
     {
         if (!CurrentUserService.UserId.HasValue)
             return new ErrorResult(Messages.LoginUnauthorized);
@@ -51,6 +51,8 @@ public class ProductService : BaseService, IProductService
         if (!categoryExists)
             return new ErrorResult(Messages.CategoryNotFound);
 
+        if (await _productRepo.ExistsAsync(c => c.Name.ToLower() == model.Name.ToLower() && !c.IsDeleted))
+            return new ErrorResult(Messages.AlreadyExists);
 
         var product = Mapper.Map<Product>(model);
         product.ShopId = shopId.Data;
@@ -61,7 +63,7 @@ public class ProductService : BaseService, IProductService
              ? new ErrorResult(message: Messages.CreateError)
              : new SuccessResult(message: Messages.CreateSuccess);
     }
-    public async Task<IResult> UpdateProductAsync(UpdateProductViewModel model)
+    public async Task<IResult> UpdateProductAsync(UpdateProductDto model)
     {
         if (!CurrentUserService.UserId.HasValue)
             return new ErrorResult(Messages.LoginUnauthorized);
@@ -74,18 +76,22 @@ public class ProductService : BaseService, IProductService
         if (!categoryExists)
             return new ErrorResult(Messages.CategoryNotFound);
 
-        var existingProduct = await GetProductByIdAsync(model.Id);
-        if (existingProduct is null)
-            return new ErrorDataResult<Product>(Messages.ProductNotFound);
+        var product = await _productRepo.GetByIdAsync(model.Id);
+        if (product == null)
+            return new ErrorResult(Messages.ProductNotFound);
 
-        existingProduct.Data.Name = model.Name;
-        existingProduct.Data.Price = model.Price;
-        existingProduct.Data.Stock = model.Stock;
-        existingProduct.Data.Color = model.Color;
-        existingProduct.Data.CategoryId = model.CategoryId;
-        existingProduct.Data.ImageUrl = model.ImageUrl;
+        if (product.ShopId != shopId.Data)
+            return new ErrorResult(Messages.ProductUnauthorized);
 
-        var updateResult = await _productRepo.UpdateAsync(existingProduct.Data);
+        // Güncelle
+        product.Name = model.Name;
+        product.Price = model.Price;
+        product.Stock = model.Stock;
+        product.Color = model.Color;
+        product.CategoryId = model.CategoryId;
+        product.ImageUrl = model.ImageUrl;
+
+        var updateResult = await _productRepo.UpdateAsync(product);
 
         return updateResult > 0
             ? new SuccessResult(Messages.UpdateSuccess)
@@ -209,15 +215,7 @@ public class ProductService : BaseService, IProductService
         return new SuccessDataResult<PaginatedList<ProductListForCustomerDto>>(result);
     }
     #endregion
-    public async Task<IDataResult<Product>> GetProductByIdAsync(Guid productId)
-    {
-        var product = await _productRepo.GetByIdAsync(productId);
-
-        if (product is null)
-            return new ErrorDataResult<Product>(Messages.ProductNotFound);
-
-        return new SuccessDataResult<Product>(product);
-    }
+    
     private async Task<bool> IsProductAvailable(Guid productId)
     {
         var product = await _productRepo.GetByIdAsync(productId);
@@ -247,5 +245,15 @@ public class ProductService : BaseService, IProductService
             return new ErrorDataResult<ProductDetailsForCustomerDto>(Messages.ProductNotFound);
 
         return new SuccessDataResult<ProductDetailsForCustomerDto>(result);
+    }
+    public async Task<IDataResult<ProductBasicDto>> GetProductByIdAsync(Guid productId)
+    {
+        var product = await _productRepo.GetByIdAsync(productId);
+        if (product == null)
+            return new ErrorDataResult<ProductBasicDto>(Messages.ProductNotFound);
+
+        var dto = Mapper.Map<ProductBasicDto>(product);
+
+        return new SuccessDataResult<ProductBasicDto>(dto);
     }
 }

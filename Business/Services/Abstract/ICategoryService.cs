@@ -1,13 +1,13 @@
 ﻿using Core.Utilities.Results;
-using Models.ViewModels.Category;
+using Models.DTOs.Category;
 
 namespace Business.Services.Abstract;
 
 public interface ICategoryService
 {
-    Task<IResult> CreateCategoryAsync(CategoryViewModel model);
-    Task<IResult> UpdateCategoryAsync(CategoryViewModel model);
+    Task<IResult> CreateCategoryAsync(CategoryBasicDto model);
+    Task<IResult> UpdateCategoryAsync(CategoryBasicDto model);
     Task<IResult> DeleteCategoryAsync(Guid categoryId);
-    Task<IDataResult<IEnumerable<CategoryViewModel>>> GetAllCategoriesAsync();
-    Task<IDataResult<CategoryViewModel>> GetCategoryByIdAsync(Guid categoryId);
+    Task<IDataResult<IEnumerable<CategoryBasicDto>>> GetAllCategoriesAsync();
+    Task<IDataResult<CategoryBasicDto>> GetCategoryByIdAsync(Guid categoryId);
 }

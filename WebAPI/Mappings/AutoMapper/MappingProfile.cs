@@ -1,10 +1,11 @@
 ﻿using AutoMapper;
 using Models.DTOs.Auth;
+using Models.DTOs.Category;
+using Models.DTOs.Product;
 using Models.Entities.Concrete;
 using Models.ViewModels.Auth;
 using Models.ViewModels.Category;
 using Models.ViewModels.Customer;
-using Models.ViewModels.Product;
 
 
 namespace WebUI.Mappings.AutoMapper;
@@ -56,16 +57,18 @@ public class MappingProfile : Profile
         #endregion
 
         #region Category
-        CreateMap<Category, CategoryViewModel>()
+        CreateMap<Category, CategoryBasicDto>()
         .ForMember(dest => dest.Name, opt => opt.MapFrom(src => (src.Name ?? string.Empty).Trim())).ReverseMap();
         #endregion
 
         #region Product 
-        CreateMap<CreateProductViewModel, Product>();
+        CreateMap<Product, ProductBasicDto>().ReverseMap();
 
-        CreateMap<Product, UpdateProductViewModel>().ReverseMap();
+        CreateMap<Product, CreateProductDto>().ReverseMap();
+
+        CreateMap<Product, UpdateProductDto>().ReverseMap();
         #endregion
-        //CreateMap<Product, ProductSellerViewModel>();
+
 
         //CreateMap<Product, ProductCustomerViewModel>();
         //CreateMap<Product, ProductFilterViewModel>();

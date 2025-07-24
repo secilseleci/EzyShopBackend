@@ -1,6 +1,7 @@
 ﻿using Core.Constants;
 using Core.Pagination;
 using Models.DTOs;
+using Models.DTOs.Shop;
 using Models.Entities.Concrete;
 
 namespace DataAccess.Repositories.Abstract;

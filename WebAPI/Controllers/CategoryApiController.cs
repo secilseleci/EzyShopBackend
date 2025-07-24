@@ -2,7 +2,7 @@
 using Business.Services.Abstract;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Models.ViewModels.Category;
+using Models.DTOs.Category;
 
 namespace WebAPI.Controllers;
 [ApiController]
@@ -31,7 +31,7 @@ public class CategoryApiController : BaseApiController
 
     [HttpPost]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Add([FromBody] CategoryViewModel model)
+    public async Task<IActionResult> Add([FromBody] CategoryBasicDto model)
     {
         var result = await _categoryService.CreateCategoryAsync(model);
         return ApiResult(result);
@@ -47,7 +47,7 @@ public class CategoryApiController : BaseApiController
 
     [HttpPut]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Update([FromBody] CategoryViewModel model)
+    public async Task<IActionResult> Update([FromBody] CategoryBasicDto model)
     {
         var result = await _categoryService.UpdateCategoryAsync(model);
         return ApiResult(result);

@@ -6,9 +6,9 @@ using Core.Utilities.Results;
 using DataAccess.Repositories.Abstract;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
+using Models.DTOs.Category;
 using Models.Entities.Concrete;
 using Models.Identity;
-using Models.ViewModels.Category;
 
 namespace Business.Services.Concrete;
 
@@ -26,7 +26,7 @@ public class CategoryService : BaseService, ICategoryService
         _categoryRepo = categoryRepo;
     }
 
-    public async Task<IResult> CreateCategoryAsync(CategoryViewModel model)
+    public async Task<IResult> CreateCategoryAsync(CategoryBasicDto model)
     {
         if (await _categoryRepo.ExistsAsync(c => c.Name.ToLower() == model.Name.ToLower() && !c.IsDeleted))
             return new ErrorResult(Messages.AlreadyExists);
@@ -37,7 +37,7 @@ public class CategoryService : BaseService, ICategoryService
             : new ErrorResult(Messages.CreateError);
     }
 
-    public async Task<IResult> UpdateCategoryAsync(CategoryViewModel model)
+    public async Task<IResult> UpdateCategoryAsync(CategoryBasicDto model)
     {
         var existingCategory = await _categoryRepo.GetByIdAsync(model.Id);
 
@@ -73,26 +73,26 @@ public class CategoryService : BaseService, ICategoryService
             : new ErrorResult(Messages.DeleteError);
     }
 
-    public async Task<IDataResult<IEnumerable<CategoryViewModel>>> GetAllCategoriesAsync()
+    public async Task<IDataResult<IEnumerable<CategoryBasicDto>>> GetAllCategoriesAsync()
     {
         var categories = await _categoryRepo.GetAllAsync();
 
         if (!categories.Any())
-            return new ErrorDataResult<IEnumerable<CategoryViewModel>>(Messages.EmptyEntityList);
+            return new ErrorDataResult<IEnumerable<CategoryBasicDto>>(Messages.EmptyEntityList);
 
-        var viewModels = Mapper.Map<IEnumerable<CategoryViewModel>>(categories);
+        var dtos = Mapper.Map<IEnumerable<CategoryBasicDto>>(categories);
 
-        return new SuccessDataResult<IEnumerable<CategoryViewModel>>(viewModels);
+        return new SuccessDataResult<IEnumerable<CategoryBasicDto>>(dtos);
     }
 
-    public async Task<IDataResult<CategoryViewModel>> GetCategoryByIdAsync(Guid categoryId)
+    public async Task<IDataResult<CategoryBasicDto>> GetCategoryByIdAsync(Guid categoryId)
     {
         var category = await _categoryRepo.GetByIdAsync(categoryId);
         if (category == null)
-            return new ErrorDataResult<CategoryViewModel>(Messages.CategoryNotFound);
+            return new ErrorDataResult<CategoryBasicDto>(Messages.CategoryNotFound);
 
-        var viewModel = Mapper.Map<CategoryViewModel>(category);
+        var dto = Mapper.Map<CategoryBasicDto>(category);
 
-        return new SuccessDataResult<CategoryViewModel>(viewModel);
+        return new SuccessDataResult<CategoryBasicDto>(dto);
     }
 }

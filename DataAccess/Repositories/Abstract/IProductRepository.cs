@@ -1,8 +1,7 @@
 ﻿using Core.Constants;
 using Core.Pagination;
-using Models.DTOs;
+using Models.DTOs.Product;
 using Models.Entities.Concrete;
-using Models.ViewModels.Product;
 
 namespace DataAccess.Repositories.Abstract;
 

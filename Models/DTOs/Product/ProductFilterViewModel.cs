@@ -1,4 +1,4 @@
-﻿namespace Models.ViewModels.Product;
+﻿namespace Models.DTOs.Product;
 
 public class ProductFilterViewModel
 { 

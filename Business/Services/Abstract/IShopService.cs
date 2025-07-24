@@ -2,6 +2,7 @@
 using Core.Pagination;
 using Core.Utilities.Results;
 using Models.DTOs;
+using Models.DTOs.Shop;
 namespace Business.Services.Abstract;
 
 public interface IShopService

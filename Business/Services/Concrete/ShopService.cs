@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Models.DTOs;
+using Models.DTOs.Shop;
 using Models.Entities.Concrete;
 using Models.Identity;
 

@@ -1,17 +1,15 @@
 ﻿using Core.Constants;
 using Core.Pagination;
 using Core.Utilities.Results;
-using Models.DTOs;
-using Models.Entities.Concrete;
-using Models.ViewModels.Product;
+using Models.DTOs.Product;
 
 namespace Business.Services.Abstract;
 
 public interface IProductService
 {
     #region Seller
-    Task<IResult> CreateProductAsync(CreateProductViewModel model);
-    Task<IResult> UpdateProductAsync(UpdateProductViewModel model);
+    Task<IResult> CreateProductAsync(CreateProductDto model);
+    Task<IResult> UpdateProductAsync(UpdateProductDto model);
     Task<IResult> DeleteProductAsync(Guid productId);
     Task<IResult> DeactivateProductAsync(Guid productId);
     Task<IResult> ReactivateProductAsync(Guid productId, int stock);
@@ -25,6 +23,6 @@ public interface IProductService
     Task<IDataResult<ProductDetailsForCustomerDto>> GetProductDetailsForCustomerAsync(Guid productId);
     #endregion  
 
-    Task<IDataResult<Product>> GetProductByIdAsync(Guid productId);
+    Task<IDataResult<ProductBasicDto>> GetProductByIdAsync(Guid productId);
 
 }

@@ -76,7 +76,7 @@
         public const string DeleteProductError = "You can only delete products that are in soldout status";
         public const string InsufficientStock = "Product stock is insufficient";
         public const string NoProductFilters = "No products found matching the filters";
-         
+        public const string ProductUnauthorized = "You are not allowed to modify this product.";
         #endregion
 
         #region Category Messages

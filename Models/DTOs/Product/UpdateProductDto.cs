@@ -1,15 +1,14 @@
 ﻿using Models.ViewModels.Abstract;
 using System.ComponentModel.DataAnnotations;
 
-namespace Models.ViewModels.Product;
+namespace Models.DTOs.Product;
 
-public class CreateProductViewModel : IImageViewModel
+public class UpdateProductDto : IImageViewModel
 {
     [Required]
-    public string Name { get; set; } = null!;
-
+    public Guid Id { get; set; }
     [Required]
-    public string? Color { get; set; }
+    public string Name { get; set; } = null!;
 
     [Required]
     [Range(1, 10000000)]
@@ -18,10 +17,11 @@ public class CreateProductViewModel : IImageViewModel
     [Required]
     public int Stock { get; set; } = 1;
 
-
     [Required(ErrorMessage = "Category required")]
 
     public Guid CategoryId { get; set; }
+
+    public string? Color { get; set; }
 
     public string? ImageUrl { get; set; }
 
