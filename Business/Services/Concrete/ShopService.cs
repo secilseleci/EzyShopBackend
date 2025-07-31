@@ -8,8 +8,8 @@ using Core.Utilities.Results;
 using DataAccess.Repositories.Abstract;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Models.DTOs;
+using Models.DTOs.Auth;
 using Models.DTOs.Shop;
 using Models.Entities.Concrete;
 using Models.Identity;
@@ -20,11 +20,9 @@ public class ShopService : BaseService, IShopService
 {
     private readonly IShopRepository _shopRepo;
     private readonly ISellerRepository _sellerRepo;
-    private readonly IProductRepository _productRepo;
 
     private readonly UserManager<AppUser> _userManager;
-    private readonly IEmailService _emailService;
-    private readonly ILogger<ShopService>? _logger;
+
 
     public ShopService(
       IMapper mapper,
@@ -32,17 +30,13 @@ public class ShopService : BaseService, IShopService
       ICurrentUserService currentUserService,
       UserManager<AppUser> userManager,
       IShopRepository shopRepo,
-      ISellerRepository sellerRepo,
-      IEmailService emailService,
-      IProductRepository productRepo,
-       ILogger<ShopService> logger) : base(mapper, config, currentUserService)
+      ISellerRepository sellerRepo
+       ) : base(mapper, config, currentUserService)
     {
         _shopRepo = shopRepo;
         _sellerRepo = sellerRepo;
         _userManager = userManager;
-        _emailService = emailService;
-        _productRepo = productRepo;
-        _logger = logger;
+
     }
 
     #region list
@@ -64,176 +58,6 @@ public class ShopService : BaseService, IShopService
         return new SuccessDataResult<ShopDetailsDto>(data: result);
     }
 
-    #endregion
-
-    #region Approve
-    public async Task<IResult> ApproveShopAsync(Guid shopId, Guid sellerId)
-    {
-        var validation = await ValidateShopApplication(shopId, sellerId);
-        if (!validation.Success)
-        {
-            return validation;
-        }
-
-        var shop = validation.Data.Shop;
-        var seller = validation.Data.Seller;
-        var user = validation.Data.User;
-
-        if (!IsShopPending(shop))
-            return new ErrorDataResult<ShopValidationResult>(Messages.ShopAlreadyProcessed);
-
-        // Update values
-        shop.IsActive = true;
-        seller.IsActive = true;
-        user.EmailConfirmed = true;
-
-        // Update all
-        var updateResult = await UpdateAllAsync(shop, seller, user);
-        if (!updateResult.Success)
-            return updateResult;
-
-        //Send email
-        var emailResult = await _emailService.SendSellerApprovedEmail(user.Email!, seller.FirstName, shop.Name);
-        if (!emailResult)
-            _logger?.LogWarning(LogMessages.EmailFailed, user.Email);
-
-        return new SuccessResult(Messages.ApprovedSuccess);
-    }
-
-    #endregion
-
-    #region Reject
-    public async Task<IResult> RejectShopAsync(Guid shopId, Guid sellerId)
-    {
-        var validation = await ValidateShopApplication(shopId, sellerId);
-
-        if (!validation.Success)
-        {
-            return validation;
-        }
-
-        var shop = validation.Data.Shop;
-        var seller = validation.Data.Seller;
-        var user = validation.Data.User;
-
-        if (!IsShopPending(shop))
-            return new ErrorDataResult<ShopValidationResult>(Messages.ShopAlreadyProcessed);
-
-
-        user.IsDeleted = true;
-
-        // Update and delete all
-        var deleteResult = await DeleteAllAsync(shop, seller, user);
-        if (!deleteResult.Success)
-            return deleteResult;
-
-        //Send email
-        var emailResult = await _emailService.SendSellerRejectedEmail(user.Email!, seller.FirstName, shop.Name);
-
-        if (!emailResult)
-            _logger?.LogWarning(LogMessages.EmailFailed, user.Email);
-
-        return new SuccessResult(Messages.RejectedSuccess);
-    }
-
-    #endregion
-
-    #region Deactivate
-    public async Task<IResult> DeactivateShopAsync(Guid shopId, Guid sellerId)
-    {
-        var validation = await ValidateShopApplication(shopId, sellerId);
-
-        if (!validation.Success)
-        {
-            return validation;
-        }
-        var shop = validation.Data.Shop;
-        var seller = validation.Data.Seller;
-        var user = validation.Data.User;
-
-        if (!IsShopActive(shop))
-            return new ErrorDataResult<ShopValidationResult>(Messages.ShopAlreadyInactive);
-
-        shop.IsActive = false;
-        seller.IsActive = false;
-        
-        var products = await _productRepo.GetWhereAsync(p => p.ShopId == shop.Id && !p.IsDeleted && p.IsActive);
-        foreach (var product in products)
-        {
-            product.IsActive = false;
-        }
-
-        // update all
-        using var transaction = await _shopRepo.BeginTransactionAsync();
-         
-        if (products.Any())
-        {
-            var updateResult = await _productRepo.UpdateRangeAsync(products);
-            if (updateResult <= 0)
-                return new ErrorResult(Messages.UpdateError);
-        }
-
-        if (await _shopRepo.UpdateAsync(shop) <= 0)
-            return new ErrorResult(Messages.UpdateError);
-
-        if (await _sellerRepo.UpdateAsync(seller) <= 0)
-            return new ErrorResult(Messages.UpdateError);
-
-        await transaction.CommitAsync();
-
-        //Send email
-        var emailResult = await _emailService.SendSellerDeactivatedEmail(user.Email!, seller.FirstName, shop.Name);
-        if (!emailResult)
-            _logger?.LogWarning(LogMessages.EmailFailed, user.Email);
-
-        return new SuccessResult(Messages.DeactivateShopSuccess);
-    }
-    #endregion
-
-    #region Reactivate
-    public async Task<IResult> ReactivateShopAsync(Guid shopId, Guid sellerId)
-    {
-        var validation = await ValidateShopApplication(shopId, sellerId);
-        if (!validation.Success)
-        {
-            return validation;
-        }
-        var shop = validation.Data.Shop;
-        var seller = validation.Data.Seller;
-
-        if (!IsShopInactive(shop))
-            return new ErrorDataResult<ShopValidationResult>(Messages.ShopAlreadyActive);
-
-        shop.IsActive = true;
-        seller.IsActive = true;
-
-        var products = await _productRepo.GetWhereAsync(p => p.ShopId == shop.Id && !p.IsDeleted && !p.IsActive);
-        foreach (var product in products)
-        {
-            product.IsActive = true;
-        }
-       
-        
-        // update all
-        using var transaction = await _shopRepo.BeginTransactionAsync();
-
-        if(products.Any())
-{
-            var updateResult = await _productRepo.UpdateRangeAsync(products);
-            if (updateResult <= 0)
-                return new ErrorResult(Messages.UpdateError);
-        }
-
-        if (await _shopRepo.UpdateAsync(shop) <= 0)
-            return new ErrorResult(Messages.UpdateError);
-
-        if (await _sellerRepo.UpdateAsync(seller) <= 0)
-            return new ErrorResult(Messages.UpdateError);
-
-        await transaction.CommitAsync();
-
-        return new SuccessResult(Messages.ReactivateSuccess);
-    }
     #endregion
 
     #region Delete
@@ -354,17 +178,43 @@ public class ShopService : BaseService, IShopService
 
     #endregion
 
-    #region Count
-    public async Task<decimal> CountPendingShopsAsync()
+    public async Task<IResult> ActivateShopBySellerIdAsync(Guid sellerId)
     {
-        return await _shopRepo.CountPendingShopsAsync(ShopStatus.Pending);
+        var shop = await _shopRepo.GetAsync(s => s.SellerId == sellerId);
+        if (shop == null)
+            return new ErrorResult(Messages.ShopNotFound);
+
+        shop.IsActive = true;
+        var result = await _shopRepo.UpdateAsync(shop);
+
+        return result > 0
+            ? new SuccessResult()
+            : new ErrorResult(Messages.UpdateError);
     }
 
-    public async Task<decimal> CountActiveShopsAsync()
+    public async Task<DataResult<Shop>> CreateShopAsync(RegisterSellerDto model, Guid sellerId)
     {
-        return await _shopRepo.CountActiveShopsAsync(ShopStatus.Active);
+        var existingShop = await _shopRepo.ExistsAsync(s => s.SellerId == sellerId && !s.IsDeleted);
+
+        if (existingShop)
+        {
+            return new ErrorDataResult<Shop>(message: Messages.AlreadyExistsShop);
+        }
+
+        var shop = Mapper.Map<Shop>(model);
+
+        shop.SellerId = sellerId;
+        shop.CreatedBy = model.FullName;
+        shop.IsActive = false;
+
+        var createShopResult = await _shopRepo.CreateAsync(shop);
+        if (createShopResult <= 0)
+        {
+            return new ErrorDataResult<Shop>(message: Messages.CreateError);
+        }
+
+        return new SuccessDataResult<Shop>(data: shop);
     }
-    #endregion
 
     public async Task<IDataResult<Guid>> GetActiveShopIdByUserIdAsync(Guid userId)
     {
@@ -375,4 +225,21 @@ public class ShopService : BaseService, IShopService
         return new SuccessDataResult<Guid>(shopId.Value);
     }
 
+    public async Task<IDataResult<Guid>> GetShopIdByUserIdAsync(Guid userId)
+    {
+        var shopId = await _shopRepo.GetShopIdByUserIdAsync(userId);
+        if (!shopId.HasValue)
+            return new ErrorDataResult<Guid>(message: Messages.ShopNotFound);
+
+        return new SuccessDataResult<Guid>(shopId.Value);
+    }
+
+    public async Task<bool> IsShopExistsAsync(string name, string taxNumber)
+    {
+        return await _shopRepo.ExistsAsync(s =>
+            !s.IsDeleted &&
+            (s.Name.ToLower().Trim() == name.ToLower().Trim()
+            || s.TaxNumber.Trim() == taxNumber.Trim()));
+    }
 }
+

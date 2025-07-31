@@ -6,7 +6,7 @@ public class Product : BaseEntity
 {
     public Product()
     {
-        IsActive = true;
+        IsActive = false;
     }
     
     public Guid CategoryId { get; set; }

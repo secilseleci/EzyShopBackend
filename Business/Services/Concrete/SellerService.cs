@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using Models.DTOs.Auth;
 using Models.Entities.Concrete;
 using Models.Identity;
+using static Models.Entities.Concrete.Seller;
 
 namespace Business.Services.Concrete;
 
@@ -18,11 +19,11 @@ public class SellerService : BaseService, ISellerService
 {
     private readonly ApplicationDbContext _context;
     private readonly ISellerRepository _sellerRepo;
-    private readonly IShopRepository _shopRepo;
+    private readonly IShopService _shopService;
     private readonly UserManager<AppUser> _userManager;
     private readonly RoleManager<AppRole> _roleManager;
     public SellerService(ApplicationDbContext context,
-     IShopRepository shopRepo,
+     IShopService shopService,
      ISellerRepository sellerRepo,
      ICurrentUserService currentUserService,
      UserManager<AppUser> userManager,
@@ -32,15 +33,15 @@ public class SellerService : BaseService, ISellerService
     {
         _context = context;
         _sellerRepo = sellerRepo;
-        _shopRepo = shopRepo;
+        _shopService = shopService;
         _userManager = userManager;
         _roleManager = roleManager;
     }
 
-    #region Create Seller Application/Registration
+    #region Create Seller Registration
     public async Task<IDataResult<Seller>> CreateSellerApplicationAsync(RegisterSellerDto model)
     {
-        #region Existing Control
+        //Seller Existing Control
         var phoneExists = await _sellerRepo.ExistsAsync(s => s.Phone == model.Phone && !s.IsDeleted);
 
         if (phoneExists)
@@ -48,21 +49,12 @@ public class SellerService : BaseService, ISellerService
             return new ErrorDataResult<Seller>(Messages.AlreadyExistsPhone);
         }
 
-        var taxNumberExists = await _shopRepo.ExistsAsync(s => s.TaxNumber.Trim() == model.TaxNumber.Trim() && !s.IsDeleted);
+        //Shop Existing Control
+        var shopExists = await _shopService.IsShopExistsAsync(model.ShopName, model.TaxNumber);
+        if (shopExists)
+            return new ErrorDataResult<Seller>(Messages.AlreadyExistsShop);
 
-        if (taxNumberExists)
-        {
-            return new ErrorDataResult<Seller>(Messages.AlreadyExistsTaxNumber);
-        }
-
-        var shopNameExists = await _shopRepo.ExistsAsync(s => s.Name.ToLower().Trim() == model.ShopName.ToLower().Trim() && !s.IsDeleted);
-
-        if (shopNameExists)
-        {
-            return new ErrorDataResult<Seller>(Messages.AlreadyExistsShopName);
-        }
-        #endregion
-
+        //Transaction Start
         var strategy = _context.Database.CreateExecutionStrategy();
 
         return await strategy.ExecuteAsync(async () =>
@@ -84,14 +76,63 @@ public class SellerService : BaseService, ISellerService
 
             // Create Shop
             var sellerId = createSellerResult.Data.Id;
-            var createShopResult = await CreateShopAsync(model, sellerId);
+            var createShopResult = await _shopService.CreateShopAsync(model, sellerId);
 
             if (!createShopResult.Success)
                 throw new Exception(createShopResult.Message);
 
+            //Transaction End
             await trx.CommitAsync();
 
             return new SuccessDataResult<Seller>(createSellerResult.Data);
+        });
+    }
+    #endregion
+
+    #region Activate Seller
+    public async Task<IResult> ActivateSellerAsync(Guid sellerId)
+    {
+        //Login check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorResult(Messages.LoginUnauthorized);
+
+        //Role check
+        if (CurrentUserService.Role != CustomRoles.Admin)
+            return new ErrorResult(Messages.UnauthorizedAccess);
+
+        //Seller check
+        var seller = await _sellerRepo.GetAsync(s => s.Id == sellerId);
+        if (seller == null)
+            return new ErrorResult(Messages.SellerNotFound);
+
+        if (seller.Status != SellerStatus.Pending)
+            return new ErrorResult(Messages.InvalidStatus);
+
+        //Transaction Start
+        var strategy = _context.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var trx = await _context.Database.BeginTransactionAsync();
+
+            //Activate seller
+            seller.Status = SellerStatus.Approved;
+            seller.IsActive = true;
+
+            var updateSellerResult = await _sellerRepo.UpdateAsync(seller);
+            if (updateSellerResult <= 0)
+                throw new Exception(Messages.UpdateError);
+
+            //Activate Shop
+            var shopActivatedResult = await _shopService.ActivateShopBySellerIdAsync(sellerId);
+            if (!shopActivatedResult.Success)
+                throw new Exception(shopActivatedResult.Message);
+
+            //Transaction End
+            await trx.CommitAsync();
+
+            return new SuccessResult();
+
         });
     }
     #endregion
@@ -109,7 +150,7 @@ public class SellerService : BaseService, ISellerService
         var user = new AppUser
         {
             Email = model.Email,
-            UserName = model.Email,
+            UserName = model.FullName,
             PhoneNumber = model.Phone
         };
 
@@ -153,41 +194,6 @@ public class SellerService : BaseService, ISellerService
 
         return new SuccessDataResult<Seller>(data: seller);
     }
-
-    private async Task<DataResult<Shop>> CreateShopAsync(RegisterSellerDto model, Guid sellerId)
-    {
-        var existingShop = await _shopRepo.ExistsAsync(s => s.SellerId == sellerId && !s.IsDeleted);
-
-        if (existingShop)
-        {
-            return new ErrorDataResult<Shop>(message: Messages.AlreadyExistsShop);
-        }
-
-        var shop = Mapper.Map<Shop>(model);
-
-        shop.SellerId = sellerId;
-        shop.CreatedBy = model.FullName;
-        shop.IsActive = false;
-
-        var createShopResult = await _shopRepo.CreateAsync(shop);
-        if (createShopResult <= 0)
-        {
-            return new ErrorDataResult<Shop>(message: Messages.CreateError);
-        }
-
-        return new SuccessDataResult<Shop>(data: shop);
-    }
-
     #endregion
 
-
-    public async Task<IDataResult<Seller>> GetActiveSellerByUserIdAsync(Guid userId)
-    {
-        var seller = await _sellerRepo.GetActiveSellerByUserIdAsync(userId);
-
-        if (seller == null)
-            return new ErrorDataResult<Seller>(message: Messages.SellerNotFound);
-
-        return new SuccessDataResult<Seller>(data: seller);
-    }
 }

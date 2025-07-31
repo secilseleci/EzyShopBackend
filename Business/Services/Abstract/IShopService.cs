@@ -1,22 +1,16 @@
-﻿using Core.Constants;
-using Core.Pagination;
-using Core.Utilities.Results;
-using Models.DTOs;
+﻿using Core.Utilities.Results;
+using Models.DTOs.Auth;
 using Models.DTOs.Shop;
+using Models.Entities.Concrete;
 namespace Business.Services.Abstract;
 
 public interface IShopService
 {
-    Task<IDataResult<PaginatedList<ShopListDto>>> GetShopsAsync(ShopStatus status, string? searchTerm, int page, int pageSize);
     Task<IDataResult<ShopDetailsDto>> GetShopDetailsAsync(Guid shopId);
-    Task<IResult>ApproveShopAsync(Guid shopId, Guid sellerId);
-    Task<IResult> RejectShopAsync(Guid shopId, Guid sellerId);
-    Task<IResult> DeactivateShopAsync(Guid shopId, Guid sellerId);
-    Task<IResult> ReactivateShopAsync(Guid shopId, Guid sellerId);
+    Task<bool> IsShopExistsAsync(string name, string taxNumber);
     Task<IResult> DeleteShopAsync(Guid shopId, Guid sellerId);
-
-    Task<decimal> CountPendingShopsAsync();
-    Task<decimal> CountActiveShopsAsync();
-
+    Task<DataResult<Shop>> CreateShopAsync(RegisterSellerDto model, Guid sellerId);
+    Task<IResult> ActivateShopBySellerIdAsync(Guid sellerId);
+    Task<IDataResult<Guid>> GetShopIdByUserIdAsync(Guid userId);
     Task<IDataResult<Guid>> GetActiveShopIdByUserIdAsync(Guid userId);
 }

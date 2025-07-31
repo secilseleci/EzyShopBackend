@@ -7,6 +7,5 @@ namespace Business.Services.Abstract;
 public interface ISellerService
 {
     Task<IDataResult<Seller>> CreateSellerApplicationAsync(RegisterSellerDto model);
-    Task<IDataResult<Seller>> GetActiveSellerByUserIdAsync(Guid userId);
-
+    Task<IResult> ActivateSellerAsync(Guid sellerId);
 }

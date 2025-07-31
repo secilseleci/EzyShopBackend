@@ -5,12 +5,12 @@ using Core.Interfaces;
 using Core.Pagination;
 using Core.Utilities.Results;
 using DataAccess.Repositories.Abstract;
-using DataAccess.Repositories.Concrete;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Models.DTOs.Product;
 using Models.Entities.Concrete;
 using Models.Identity;
+using Models.ViewModels.Product;
 
 namespace Business.Services.Concrete;
 
@@ -40,23 +40,39 @@ public class ProductService : BaseService, IProductService
     #region Seller
     public async Task<IResult> CreateProductAsync(CreateProductDto model)
     {
+        //Login check
         if (!CurrentUserService.UserId.HasValue)
             return new ErrorResult(Messages.LoginUnauthorized);
 
+        //Role check
+        if (CurrentUserService.Role != CustomRoles.Seller)
+            return new ErrorResult(Messages.UnauthorizedAccess);
+
+        //Active Shop check 
         var shopId = await _shopService.GetActiveShopIdByUserIdAsync(CurrentUserService.UserId.Value);
+
         if (!shopId.Success)
             return new ErrorResult(Messages.ShopNotFound);
 
+        //Category check
         var categoryExists = await _categoryRepo.ExistsAsync(c => c.Id == model.CategoryId && !c.IsDeleted);
         if (!categoryExists)
             return new ErrorResult(Messages.CategoryNotFound);
 
-        if (await _productRepo.ExistsAsync(c => c.Name.ToLower() == model.Name.ToLower() && !c.IsDeleted))
+        //Product check
+        if (await _productRepo.ExistsAsync(p =>
+        p.Name.ToLower() == model.Name.ToLower()
+        && p.ShopId == shopId.Data
+        && !p.IsDeleted))
+        {
             return new ErrorResult(Messages.AlreadyExists);
+        }
 
+        //Data mapping
         var product = Mapper.Map<Product>(model);
         product.ShopId = shopId.Data;
 
+        //Insert
         var createResult = await _productRepo.CreateAsync(product);
 
         return createResult <= 0
@@ -65,25 +81,45 @@ public class ProductService : BaseService, IProductService
     }
     public async Task<IResult> UpdateProductAsync(UpdateProductDto model)
     {
+        //Login check
         if (!CurrentUserService.UserId.HasValue)
             return new ErrorResult(Messages.LoginUnauthorized);
 
+        //Role check
+        if (CurrentUserService.Role != CustomRoles.Seller)
+            return new ErrorResult(Messages.UnauthorizedAccess);
+
+        //Active Shop check 
         var shopId = await _shopService.GetActiveShopIdByUserIdAsync(CurrentUserService.UserId.Value);
+
         if (!shopId.Success)
             return new ErrorResult(Messages.ShopNotFound);
 
+        //Category check
         var categoryExists = await _categoryRepo.ExistsAsync(c => c.Id == model.CategoryId && !c.IsDeleted);
         if (!categoryExists)
             return new ErrorResult(Messages.CategoryNotFound);
 
-        var product = await _productRepo.GetByIdAsync(model.Id);
-        if (product == null)
+        //Product check
+        var product = await _productRepo.GetAsync(p =>
+             p.Id == model.Id &&
+             p.ShopId == shopId.Data &&
+             !p.IsDeleted);
+
+        if (product is null)
             return new ErrorResult(Messages.ProductNotFound);
 
-        if (product.ShopId != shopId.Data)
-            return new ErrorResult(Messages.ProductUnauthorized);
+        //Data check
+        var alreadyExists = await _productRepo.ExistsAsync(p =>
+        p.Id != model.Id &&
+        p.Name.ToLower() == model.Name.ToLower() &&
+        p.ShopId == shopId.Data &&
+        !p.IsDeleted);
 
-        // Güncelle
+        if (alreadyExists)
+            return new ErrorResult(Messages.AlreadyExists);
+
+        //Data mapping
         product.Name = model.Name;
         product.Price = model.Price;
         product.Stock = model.Stock;
@@ -91,6 +127,7 @@ public class ProductService : BaseService, IProductService
         product.CategoryId = model.CategoryId;
         product.ImageUrl = model.ImageUrl;
 
+        //Update
         var updateResult = await _productRepo.UpdateAsync(product);
 
         return updateResult > 0
@@ -99,45 +136,89 @@ public class ProductService : BaseService, IProductService
     }
     public async Task<IResult> DeleteProductAsync(Guid productId)
     {
+        // Login check
         if (!CurrentUserService.UserId.HasValue)
             return new ErrorResult(Messages.LoginUnauthorized);
 
+        // Role check
+        if (CurrentUserService.Role != CustomRoles.Seller)
+            return new ErrorResult(Messages.UnauthorizedAccess);
+
+        // Active Shop check 
         var shopId = await _shopService.GetActiveShopIdByUserIdAsync(CurrentUserService.UserId.Value);
         if (!shopId.Success)
             return new ErrorResult(Messages.ShopNotFound);
 
-        if (await IsProductAvailable(productId))
+        // Product check  
+        var product = await _productRepo.GetAsync(p =>
+             p.Id == productId &&
+             p.ShopId == shopId.Data &&
+             !p.IsDeleted);
+
+        if (product is null)
+            return new ErrorResult(Messages.ProductNotFound);
+        if (product.IsActive && product.Stock > 0)
             return new ErrorResult(Messages.DeleteProductError);
 
-
+        // Soft delete
         var result = await _productRepo.SoftDeleteAsync(productId);
         return result > 0
             ? new SuccessResult(Messages.DeleteSuccess)
-             : new ErrorResult(Messages.DeleteError);
-
+            : new ErrorResult(Messages.DeleteError);
     }
+    public async Task<IDataResult<ProductDetailsForSellerDto>> GetProductDetailsForSellerAsync(Guid productId)
+    {
+        //Login check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorDataResult<ProductDetailsForSellerDto>(Messages.LoginUnauthorized);
+
+        //Role check
+        if (CurrentUserService.Role != CustomRoles.Seller)
+            return new ErrorDataResult<ProductDetailsForSellerDto>(Messages.UnauthorizedAccess);
+
+        //Shop check 
+        var shopId = await _shopService.GetShopIdByUserIdAsync(CurrentUserService.UserId.Value);
+
+        if (!shopId.Success)
+            return new ErrorDataResult<ProductDetailsForSellerDto>(Messages.ShopNotFound);
+
+        //Product check
+        var result = await _productRepo.GetProductDetailsDtosForSellerAsync(shopId.Data, productId);
+
+        if (result == null)
+        {
+            return new ErrorDataResult<ProductDetailsForSellerDto>(message: Messages.ProductNotFound);
+        }
+
+        return new SuccessDataResult<ProductDetailsForSellerDto>(data: result);
+    }
+
     public async Task<IResult> DeactivateProductAsync(Guid productId)
     {
+        //Login check
         if (!CurrentUserService.UserId.HasValue)
             return new ErrorResult(Messages.LoginUnauthorized);
 
+        //Role check
+        if (CurrentUserService.Role != CustomRoles.Seller)
+            return new ErrorResult(Messages.UnauthorizedAccess);
+
+        //Active Shop check 
         var shopId = await _shopService.GetActiveShopIdByUserIdAsync(CurrentUserService.UserId.Value);
+
         if (!shopId.Success)
             return new ErrorResult(Messages.ShopNotFound);
 
-        if (!await IsProductAvailable(productId))
-            return new ErrorResult(Messages.ProductAlreadyInactive);
-
+        //Product check
         var product = await _productRepo.GetByIdAsync(productId);
         if (product is null)
             return new ErrorResult(Messages.ProductNotFound);
 
         if (product.ShopId != shopId.Data)
-            return new ErrorResult(Messages.UnauthorizedAccess);
+            return new ErrorResult(Messages.ProductUnauthorized);
 
-        product.Stock = 0;
+        //Update
         product.IsActive = false;
-
         var result = await _productRepo.UpdateAsync(product);
 
         return result > 0
@@ -146,16 +227,22 @@ public class ProductService : BaseService, IProductService
     }
     public async Task<IResult> ReactivateProductAsync(Guid productId, int stock)
     {
+        //Login check
         if (!CurrentUserService.UserId.HasValue)
             return new ErrorResult(Messages.LoginUnauthorized);
 
+        //Role check
+        if (CurrentUserService.Role != CustomRoles.Seller)
+            return new ErrorResult(Messages.UnauthorizedAccess);
+
+        //Active Shop check 
         var shopId = await _shopService.GetActiveShopIdByUserIdAsync(CurrentUserService.UserId.Value);
+
         if (!shopId.Success)
             return new ErrorResult(Messages.ShopNotFound);
 
-        if (await IsProductAvailable(productId))
-            return new ErrorResult(Messages.ProductAlreadyActive);
 
+        //Product check
         var product = await _productRepo.GetByIdAsync(productId);
         if (product is null)
             return new ErrorResult(Messages.ProductNotFound);
@@ -163,6 +250,11 @@ public class ProductService : BaseService, IProductService
         if (product.ShopId != shopId.Data)
             return new ErrorResult(Messages.UnauthorizedAccess);
 
+        // Stock check
+        if (stock <= 0)
+            return new ErrorResult(Messages.InsufficientStock);
+
+        //Update
         product.Stock = stock;
         product.IsActive = true;
 
@@ -173,54 +265,60 @@ public class ProductService : BaseService, IProductService
             : new ErrorResult(Messages.ReactivateProductError);
     }
 
-    public async Task<IDataResult<PaginatedList<ProductListForSellerDto>>> GetProductsAsync(ProductStatus status, string? searchTerm, int page, int pageSize)
+    public async Task<IDataResult<PaginatedList<ProductListForSellerDto>>> GetProductsAsync(ProductFilterForSellerViewModel model)
     {
+        // Login Check
         if (!CurrentUserService.UserId.HasValue)
             return new ErrorDataResult<PaginatedList<ProductListForSellerDto>>(Messages.LoginUnauthorized);
 
-        var shopId = await _shopService.GetActiveShopIdByUserIdAsync(CurrentUserService.UserId.Value);
+        // Role check
+        if (CurrentUserService.Role != CustomRoles.Seller)
+            return new ErrorDataResult<PaginatedList<ProductListForSellerDto>>(Messages.UnauthorizedAccess);
 
+        // Shop check 
+        var shopId = await _shopService.GetShopIdByUserIdAsync(CurrentUserService.UserId.Value);
         if (!shopId.Success)
             return new ErrorDataResult<PaginatedList<ProductListForSellerDto>>(Messages.ShopNotFound);
 
-        var result = await _productRepo.GetProductDtosAsync(status, shopId.Data, searchTerm, page, pageSize);
+        // Repository 
+        var result = await _productRepo.GetFilteredProductsForSellerAsync(model, shopId.Data);
 
         return new SuccessDataResult<PaginatedList<ProductListForSellerDto>>(result);
     }
-    public async Task<IDataResult<ProductDetailsForSellerDto>> GetProductDetailsForSellerAsync(Guid productId)
-    {
-        if (!CurrentUserService.UserId.HasValue)
-            return new ErrorDataResult<ProductDetailsForSellerDto>(Messages.LoginUnauthorized);
 
-        var shopId = await _shopService.GetActiveShopIdByUserIdAsync(CurrentUserService.UserId.Value);
-
-        if (!shopId.Success)
-            return new ErrorDataResult<ProductDetailsForSellerDto>(Messages.ShopNotFound);
-
-        var result = await _productRepo.GetProductDetailsDtosForSellerAsync(shopId.Data, productId);
-
-        if (result == null)
-        {
-            return new ErrorDataResult<ProductDetailsForSellerDto>(message: Messages.ProductNotFound);
-        }
-
-        return new SuccessDataResult<ProductDetailsForSellerDto>(data: result);
-    }
     #endregion
 
     #region Customer
-    public async Task<IDataResult<PaginatedList<ProductListForCustomerDto>>> GetFilteredProductsAsync(ProductFilterViewModel model)
+
+    public async Task<IDataResult<ProductDetailsForCustomerDto>> GetProductDetailsForCustomerAsync(Guid productId)
     {
-        var result = await _productRepo.GetFilteredProductDtosAsync(model);
-        return new SuccessDataResult<PaginatedList<ProductListForCustomerDto>>(result);
+        //Login check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorDataResult<ProductDetailsForCustomerDto>(Messages.LoginUnauthorized);
+
+        //Role check
+        if (CurrentUserService.Role != CustomRoles.Customer)
+            return new ErrorDataResult<ProductDetailsForCustomerDto>(Messages.UnauthorizedAccess);
+
+        //Product check
+        if (!await IsProductAvailableForCustomer(productId))
+            return new ErrorDataResult<ProductDetailsForCustomerDto>(Messages.ProductNotFound);
+
+        //Repository
+        var result = await _productRepo.GetProductDetailsDtosForCustomerAsync(productId);
+        if (result is null)
+            return new ErrorDataResult<ProductDetailsForCustomerDto>(Messages.ProductNotFound);
+
+        return new SuccessDataResult<ProductDetailsForCustomerDto>(result);
     }
-    #endregion
-    
-    private async Task<bool> IsProductAvailable(Guid productId)
+    private async Task<bool> IsProductAvailableForCustomer(Guid productId)
     {
         var product = await _productRepo.GetByIdAsync(productId);
 
         if (product == null)
+            return false;
+
+        if (product.IsDeleted)
             return false;
 
         if (!product.IsActive)
@@ -232,28 +330,12 @@ public class ProductService : BaseService, IProductService
         return true;
     }
 
-    public async Task<IDataResult<ProductDetailsForCustomerDto>> GetProductDetailsForCustomerAsync(Guid productId)
+    #endregion
+
+
+    public async Task<IDataResult<PaginatedList<ProductListForCustomerDto>>> GetFilteredProductsAsync(ProductFilterViewModel model)
     {
-        if (!CurrentUserService.UserId.HasValue)
-            return new ErrorDataResult<ProductDetailsForCustomerDto>(Messages.LoginUnauthorized);
-
-        if (!await IsProductAvailable(productId))
-            return new ErrorDataResult<ProductDetailsForCustomerDto>(Messages.ProductNotFound);
-
-        var result = await _productRepo.GetProductDetailsDtosForCustomerAsync(productId);
-        if (result is null)
-            return new ErrorDataResult<ProductDetailsForCustomerDto>(Messages.ProductNotFound);
-
-        return new SuccessDataResult<ProductDetailsForCustomerDto>(result);
-    }
-    public async Task<IDataResult<ProductBasicDto>> GetProductByIdAsync(Guid productId)
-    {
-        var product = await _productRepo.GetByIdAsync(productId);
-        if (product == null)
-            return new ErrorDataResult<ProductBasicDto>(Messages.ProductNotFound);
-
-        var dto = Mapper.Map<ProductBasicDto>(product);
-
-        return new SuccessDataResult<ProductBasicDto>(dto);
+        var result = await _productRepo.GetFilteredProductDtosAsync(model);
+        return new SuccessDataResult<PaginatedList<ProductListForCustomerDto>>(result);
     }
 }

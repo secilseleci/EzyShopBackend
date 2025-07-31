@@ -2,6 +2,7 @@
 using Core.Pagination;
 using Core.Utilities.Results;
 using Models.DTOs.Product;
+using Models.ViewModels.Product;
 
 namespace Business.Services.Abstract;
 
@@ -13,7 +14,7 @@ public interface IProductService
     Task<IResult> DeleteProductAsync(Guid productId);
     Task<IResult> DeactivateProductAsync(Guid productId);
     Task<IResult> ReactivateProductAsync(Guid productId, int stock);
-    Task<IDataResult<PaginatedList<ProductListForSellerDto>>> GetProductsAsync(ProductStatus status, string? searchTerm, int page, int pageSize);
+    Task<IDataResult<PaginatedList<ProductListForSellerDto>>> GetProductsAsync(ProductFilterForSellerViewModel model);
     Task<IDataResult<ProductDetailsForSellerDto>> GetProductDetailsForSellerAsync(Guid productId);
     #endregion
 
@@ -22,7 +23,6 @@ public interface IProductService
     Task<IDataResult<PaginatedList<ProductListForCustomerDto>>> GetFilteredProductsAsync(ProductFilterViewModel model);
     Task<IDataResult<ProductDetailsForCustomerDto>> GetProductDetailsForCustomerAsync(Guid productId);
     #endregion  
-
-    Task<IDataResult<ProductBasicDto>> GetProductByIdAsync(Guid productId);
+ 
 
 }

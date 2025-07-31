@@ -3,10 +3,7 @@ using Models.DTOs.Auth;
 using Models.DTOs.Category;
 using Models.DTOs.Product;
 using Models.Entities.Concrete;
-using Models.ViewModels.Auth;
-using Models.ViewModels.Category;
 using Models.ViewModels.Customer;
-
 
 namespace WebUI.Mappings.AutoMapper;
 
@@ -31,20 +28,13 @@ public class MappingProfile : Profile
 
 
         CreateMap<RegisterSellerDto, Shop>()
-    .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.ShopName));
+            .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.ShopName));
 
-        #endregion
-
-        #region Shop for Register
-        CreateMap<RegisterSellerViewModel, Shop>()
-            .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.ShopName))
-            .ForMember(dest => dest.SellerId, opt => opt.Ignore())
-            .ForMember(dest => dest.Products, opt => opt.Ignore());
         #endregion
 
         #region Customer for Register
         CreateMap<RegisterCustomerDto, Customer>()
-        .AfterMap((src, dest) =>
+            .AfterMap((src, dest) =>
         {
             var names = src.FullName.Split(' ');
             dest.FirstName = names[0];
@@ -52,8 +42,9 @@ public class MappingProfile : Profile
                             ? string.Join(" ", names.Skip(1))
                             : "";
         });
+
         CreateMap<Customer, RegisterCustomerDto>()
-        .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => $"{src.FirstName} {src.LastName}".Trim()));
+            .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => $"{src.FirstName} {src.LastName}".Trim()));
         #endregion
 
         #region Category
@@ -69,43 +60,9 @@ public class MappingProfile : Profile
         CreateMap<Product, UpdateProductDto>().ReverseMap();
         #endregion
 
-
-        //CreateMap<Product, ProductCustomerViewModel>();
-        //CreateMap<Product, ProductFilterViewModel>();
-        //CreateMap<Product, ProductDetailViewModel>();
-
-
-        //#endregion
-
-
-
-        //  #region Shop  
-        /// CreateMap<Shop, ShopViewModel>().ReverseMap();
-
-        //  #endregion
-
-
-
         #region Customer for List
         CreateMap<Customer, CustomerListViewModel>()
          .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => $"{src.FirstName} {src.LastName}".Trim()));
         #endregion
-
-        //#region Seller for Profile
-        //CreateMap<Seller, SellerViewModel>()
-        //  .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => $"{src.Name} {src.Surname}".Trim()))
-        //  .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email));
-
-
-
-        //#endregion
-
-
-
-
-
-
-
-
     }
 }

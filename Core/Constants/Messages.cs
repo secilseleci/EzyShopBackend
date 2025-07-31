@@ -62,9 +62,12 @@
         public const string OldPasswordError = "Old password is wrong";
         #endregion
 
+        #region Seller
+        public const string InvalidStatus = "This user's status is not suitable for the action you are trying to perform.";
+        #endregion
 
         #region Product Messages 
-         
+
         public const string ProductAddedSuccess = "Product added to cart";
         public const string ProductAddedError = "Error occurred while adding the Product to Cart";
         public const string DeactivateProductSuccess = "Product has been successfully deactivated";

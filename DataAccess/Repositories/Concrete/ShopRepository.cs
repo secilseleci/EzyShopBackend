@@ -82,6 +82,14 @@ public class ShopRepository(ApplicationDbContext context) : BaseRepository<Shop>
 
         return shop?.Id;
     }
+    public async Task<Guid?> GetShopIdByUserIdAsync(Guid userId)
+    {
+        var shop = await _dataContext.Shops
+          .Where(s => s.SellerId == userId  && !s.IsDeleted)
+          .FirstOrDefaultAsync();
+
+        return shop?.Id;
+    }
     private static Expression<Func<Shop, bool>> GetStatusFilter(ShopStatus status)
     {
         return status switch
