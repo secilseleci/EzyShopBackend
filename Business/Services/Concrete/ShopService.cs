@@ -23,38 +23,7 @@ public class ShopService : BaseService, IShopService
         _shopRepo = shopRepo;
 
     }
-
-    #region Delete Shop
-    public async Task<IResult> DeleteShopAsync(Guid sellerId)
-    {
-        var shop = await _shopRepo.GetAsync(s => s.SellerId == sellerId && !s.IsDeleted);
-        if (shop == null)
-            return new ErrorResult(Messages.ShopNotFound);
-
-        var deleteResult = await _shopRepo.SoftDeleteAsync(shop.Id);
-
-        return deleteResult > 0
-            ? new SuccessResult(Messages.DeleteSuccess)
-            : new ErrorResult(Messages.DeleteError);
-    }
-    #endregion
-
-    #region Activate Shop
-
-    public async Task<IResult> ActivateShopBySellerIdAsync(Guid sellerId)
-    {
-        var shop = await _shopRepo.GetAsync(s => s.SellerId == sellerId);
-        if (shop == null)
-            return new ErrorResult(Messages.ShopNotFound);
-
-        shop.IsActive = true;
-        var result = await _shopRepo.UpdateAsync(shop);
-
-        return result > 0
-            ? new SuccessResult()
-            : new ErrorResult(Messages.UpdateError);
-    }
-
+    #region Create Shop
     public async Task<DataResult<Shop>> CreateShopAsync(RegisterSellerDto model, Guid sellerId)
     {
         var existingShopResult = await CheckShopExistsAsync(model.ShopName, model.TaxNumber);
@@ -79,6 +48,59 @@ public class ShopService : BaseService, IShopService
         return new SuccessDataResult<Shop>(data: shop);
     }
     #endregion
+
+    #region Delete Shop
+    public async Task<IResult> DeleteShopAsync(Guid sellerId)
+    {
+        var shop = await _shopRepo.GetAsync(s => s.SellerId == sellerId && !s.IsDeleted);
+        if (shop == null)
+            return new ErrorResult(Messages.ShopNotFound);
+
+        var deleteResult = await _shopRepo.SoftDeleteAsync(shop.Id);
+
+        return deleteResult > 0
+            ? new SuccessResult(Messages.DeleteSuccess)
+            : new ErrorResult(Messages.DeleteError);
+    }
+  
+    #endregion
+   
+    #region Activate Shop
+    public async Task<IResult> ActivateShopBySellerIdAsync(Guid sellerId)
+    {
+        var shop = await _shopRepo.GetAsync(s => s.SellerId == sellerId);
+        if (shop == null)
+            return new ErrorResult(Messages.ShopNotFound);
+
+        shop.IsActive = true;
+        var result = await _shopRepo.UpdateAsync(shop);
+
+        return result > 0
+            ? new SuccessResult()
+            : new ErrorResult(Messages.UpdateError);
+    }
+    #endregion
+
+    #region Deactivate Shop
+    public async Task<IResult> DeactivateShopBySellerIdAsync(Guid sellerId)
+    {
+        var shop = await _shopRepo.GetAsync(s => s.SellerId == sellerId);
+        if (shop == null)
+            return new ErrorResult(Messages.ShopNotFound);
+
+        if (!shop.IsActive)
+            return new ErrorResult(Messages.ShopAlreadyInactive);
+
+        shop.IsActive = false;
+        var result = await _shopRepo.UpdateAsync(shop);
+
+        return result > 0
+            ? new SuccessResult()
+            : new ErrorResult(Messages.UpdateError);
+    }
+    #endregion
+
+    #region Find Active Shop By UserId
     public async Task<IDataResult<Guid>> GetActiveShopIdByUserIdAsync(Guid userId)
     {
         var shopId = await _shopRepo.GetActiveShopIdByUserIdAsync(userId);
@@ -87,7 +109,9 @@ public class ShopService : BaseService, IShopService
 
         return new SuccessDataResult<Guid>(shopId.Value);
     }
+    #endregion
 
+    #region Find Shop By UserId
     public async Task<IDataResult<Guid>> GetShopIdByUserIdAsync(Guid userId)
     {
         var shopId = await _shopRepo.GetShopIdByUserIdAsync(userId);
@@ -96,7 +120,9 @@ public class ShopService : BaseService, IShopService
 
         return new SuccessDataResult<Guid>(shopId.Value);
     }
+    #endregion
 
+    #region Check Shop Exist
     public async Task<IResult> CheckShopExistsAsync(string name, string taxNumber)
     {
         var shopNameExists = await _shopRepo.ExistsAsync(s => s.Name == name && !s.IsDeleted);
@@ -110,7 +136,7 @@ public class ShopService : BaseService, IShopService
         return new SuccessResult();
     }
 
-
+    #endregion
 
 }
 

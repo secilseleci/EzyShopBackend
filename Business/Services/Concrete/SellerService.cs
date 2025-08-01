@@ -2,6 +2,7 @@
 using Business.Services.Abstract;
 using Core.Constants;
 using Core.Interfaces;
+using Core.Pagination;
 using Core.Utilities.Results;
 using DataAccess;
 using DataAccess.Repositories.Abstract;
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Models.DTOs.Auth;
+using Models.DTOs.Seller;
 using Models.Entities.Concrete;
 using Models.Identity;
 using static Models.Entities.Concrete.Seller;
@@ -129,10 +131,23 @@ public class SellerService : BaseService, ISellerService
             if (!shopActivatedResult.Success)
                 throw new Exception(shopActivatedResult.Message);
 
+            // AppUser email confirm
+            var existingUser = await _userManager.FindByIdAsync(sellerId.ToString());
+            if (existingUser == null)
+                throw new Exception(Messages.UserNotFound);
+
+            existingUser.EmailConfirmed = true;
+
+            var updateUserResult = await _userManager.UpdateAsync(existingUser);
+            if (!updateUserResult.Succeeded)
+            {
+                var errors = string.Join(" | ", updateUserResult.Errors.Select(e => e.Description));
+                throw new Exception(errors);
+            }
             //Transaction End
             await trx.CommitAsync();
 
-            return new SuccessResult();
+            return new SuccessResult(Messages.SellerActivated);
 
         });
     }
@@ -187,9 +202,78 @@ public class SellerService : BaseService, ISellerService
             //Transaction End
             await trx.CommitAsync();
 
-            return new SuccessResult();
+            return new SuccessResult(Messages.SellerDeactivated);
 
         });
+    }
+    #endregion
+
+    #region Ban Seller
+    public async Task<IResult> BanSellerAsync(Guid sellerId)
+    {
+        //Login check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorResult(Messages.LoginUnauthorized);
+
+        //Role check
+        if (CurrentUserService.Role != CustomRoles.Admin)
+            return new ErrorResult(Messages.UnauthorizedAccess);
+
+        //Seller check
+        var seller = await _sellerRepo.GetAsync(s => s.Id == sellerId);
+        if (seller == null)
+            return new ErrorResult(Messages.SellerNotFound);
+
+        if (seller.Status != SellerStatus.Approved)
+            return new ErrorResult(Messages.InvalidStatus);
+
+        //Transaction Start
+        var strategy = _context.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var trx = await _context.Database.BeginTransactionAsync();
+
+            //Deactivate Shop
+            var shopDeactivateResult = await _shopService.DeactivateShopBySellerIdAsync(sellerId);
+            if (!shopDeactivateResult.Success)
+                throw new Exception(shopDeactivateResult.Message);
+
+            //Deactivate Seller
+            seller.Status = SellerStatus.Banned;
+            seller.IsActive = false;
+
+            var updateSellerResult = await _sellerRepo.UpdateAsync(seller);
+            if (updateSellerResult <= 0)
+                throw new Exception(Messages.UpdateError);
+
+            //Transaction End
+            await trx.CommitAsync();
+
+            return new SuccessResult(Messages.SellerBanned);
+
+        });
+    }
+    #endregion
+
+    #region List Seller
+    public async Task<DataResult<PaginatedList<SellerListItemDto>>> GetFilteredSellerListAsync(SellerFilterDto filter)
+    {
+        // Login check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorDataResult<PaginatedList<SellerListItemDto>>(Messages.LoginUnauthorized);
+
+        // Role check
+        if (CurrentUserService.Role != CustomRoles.Admin)
+            return new ErrorDataResult<PaginatedList<SellerListItemDto>>(Messages.UnauthorizedAccess);
+
+        // Repository
+        var result = await _sellerRepo.GetFilteredSellerListAsync(filter);
+
+        if (result == null || !result.Items.Any())
+            return new ErrorDataResult<PaginatedList<SellerListItemDto>>(message: Messages.EmptyEntityList);
+
+        return new SuccessDataResult<PaginatedList<SellerListItemDto>>(data: result);
     }
     #endregion
 
