@@ -8,4 +8,6 @@ public interface ISellerService
 {
     Task<IDataResult<Seller>> CreateSellerApplicationAsync(RegisterSellerDto model);
     Task<IResult> ActivateSellerAsync(Guid sellerId);
+    Task<IResult> DeactivateSellerAsync(Guid sellerId);
+
 }

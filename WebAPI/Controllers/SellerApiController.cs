@@ -13,9 +13,9 @@ public class SellerApiController : ControllerBase
     {
         _sellerService = sellerService;
     }
-    #region Approve
-    [HttpPost("approve")]
-    public async Task<IActionResult> ApproveSeller([FromForm] Guid sellerId)
+    #region Activate
+    [HttpPost("activate-seller")]
+    public async Task<IActionResult> ActivateSeller([FromForm] Guid sellerId)
     {
         var result = await _sellerService.ActivateSellerAsync(sellerId);
 
@@ -25,5 +25,19 @@ public class SellerApiController : ControllerBase
         }
         return Ok(new { success = true, message = result.Message });
     }
-#endregion
+    #endregion
+
+    #region Deactivate
+    [HttpPost("deactivate-seller")]
+    public async Task<IActionResult> DeactivateSeller([FromForm] Guid sellerId)
+    {
+        var result = await _sellerService.DeactivateSellerAsync(sellerId);
+
+        if (!result.Success)
+        {
+            return BadRequest(new { success = false, message = result.Message });
+        }
+        return Ok(new { success = true, message = result.Message });
+    }
+    #endregion
 }

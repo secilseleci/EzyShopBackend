@@ -50,9 +50,10 @@ public class SellerService : BaseService, ISellerService
         }
 
         //Shop Existing Control
-        var shopExists = await _shopService.IsShopExistsAsync(model.ShopName, model.TaxNumber);
-        if (shopExists)
-            return new ErrorDataResult<Seller>(Messages.AlreadyExistsShop);
+        var shopExists = await _shopService.CheckShopExistsAsync(model.ShopName, model.TaxNumber);
+        if (!shopExists.Success)
+            return new ErrorDataResult<Seller>(shopExists.Message);
+
 
         //Transaction Start
         var strategy = _context.Database.CreateExecutionStrategy();
@@ -137,6 +138,61 @@ public class SellerService : BaseService, ISellerService
     }
     #endregion
 
+    #region Deactivate Seller
+    public async Task<IResult> DeactivateSellerAsync(Guid sellerId)
+    {
+        //Login check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorResult(Messages.LoginUnauthorized);
+
+        //Role check
+        if (CurrentUserService.Role != CustomRoles.Admin)
+            return new ErrorResult(Messages.UnauthorizedAccess);
+
+        //Seller check
+        var seller = await _sellerRepo.GetAsync(s => s.Id == sellerId);
+        if (seller == null)
+            return new ErrorResult(Messages.SellerNotFound);
+
+        if (seller.Status != SellerStatus.Pending)
+            return new ErrorResult(Messages.InvalidStatus);
+
+        //Transaction Start
+        var strategy = _context.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var trx = await _context.Database.BeginTransactionAsync();
+
+            //Delete Shop
+            var shopDeleteResult = await _shopService.DeleteShopAsync(sellerId);
+            if (!shopDeleteResult.Success)
+                throw new Exception(shopDeleteResult.Message);
+
+            //Delete Seller
+            seller.Status = SellerStatus.Rejected;
+            seller.IsActive = false;
+            seller.IsDeleted = true;
+
+            var updateSellerResult = await _sellerRepo.UpdateAsync(seller);
+            if (updateSellerResult <= 0)
+                throw new Exception(Messages.UpdateError);
+
+            //Delete AppUser
+            var deleteAppUserResult = await DeleteAppUserAsync(sellerId);
+
+            if (!deleteAppUserResult.Success)
+                throw new Exception(deleteAppUserResult.Message);
+
+            //Transaction End
+            await trx.CommitAsync();
+
+            return new SuccessResult();
+
+        });
+    }
+    #endregion
+
     #region Private Methods
     private async Task<DataResult<AppUser>> CreateAppUserAsync(RegisterSellerDto model)
     {
@@ -169,7 +225,22 @@ public class SellerService : BaseService, ISellerService
 
         return new SuccessDataResult<AppUser>(data: user);
     }
+    private async Task<IResult> DeleteAppUserAsync(Guid userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user == null)
+            return new ErrorResult(Messages.UserNotFound);
 
+
+        var deleteResult = await _userManager.DeleteAsync(user);
+        if (!deleteResult.Succeeded)
+        {
+            var errorMessages = string.Join(" | ", deleteResult.Errors.Select(e => e.Description));
+            return new ErrorResult(errorMessages);
+        }
+
+        return new SuccessResult();
+    }
     private async Task<DataResult<Seller>> CreateSellerAsync(RegisterSellerDto model, Guid userId)
     {
         var existingSeller = await _sellerRepo.GetByIdAsync(userId);
