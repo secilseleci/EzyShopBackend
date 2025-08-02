@@ -1,41 +1,55 @@
-﻿using Core.Pagination;
-using DataAccess.Repositories.Abstract;
+﻿using DataAccess.Repositories.Abstract;
 using Microsoft.EntityFrameworkCore;
+using Models.DTOs.Customer;
 using Models.Entities.Concrete;
-using Models.ViewModels.Customer;
-
 
 namespace DataAccess.Repositories.Concrete;
-
 public class CustomerRepository(ApplicationDbContext context) : BaseRepository<Customer>(context), ICustomerRepository
 {
-    public async Task<decimal> CountAsync()
+    public async Task<long> CountAsync()
     {
         return await _dataContext.Customers
-            .Where(c => !c.IsDeleted)
+            .Where(c => !c.IsDeleted && c.IsActive)
             .LongCountAsync();
     }
-
-    public async Task<PaginatedList<CustomerListViewModel>> GetPaginatedCustomerDtosAsync(
-    string? searchTerm, int page, int pageSize)
+    public async Task<CustomerSearchResultDto?> GetCustomerDtoByPhoneAsync(string phone)
     {
-        var query = from customer in _dataContext.Customers
-                    join user in _dataContext.Users
-                     on customer.Id equals user.Id
-                    where !customer.IsDeleted &&
-                          (string.IsNullOrEmpty(searchTerm) ||
-                           (customer.FirstName + " " + customer.LastName).Contains(searchTerm) ||
-                           customer.Address.Contains(searchTerm))
-                    select new CustomerListViewModel
-                    {
-                        Id = customer.Id,
-                        FullName = customer.FirstName + " " + customer.LastName,
-                        Email = user.Email!,
-                        Address = customer.Address,
-                        Phone = customer.Phone
-                    };
+        var result = await (from c in _dataContext.Customers
+                            join u in _dataContext.Users on c.Id equals u.Id
+                            where c.Phone == phone
+                            select new CustomerSearchResultDto
+                            {
+                                CustomerId = c.Id,
+                                FirstName = c.FirstName,
+                                LastName = c.LastName,
+                                Phone = c.Phone,
+                                Address = c.Address,
+                                CreatedDate = c.CreatedAt,
+                                DeletedDate = c.DeletedAt,
+                                UpdatedDate = c.UpdatedAt,
+                                Email = u.Email!
+                            }).FirstOrDefaultAsync();
 
-        return await GetPaginatedAsync(query, page, pageSize);
+        return result;
     }
+    public async Task<CustomerSearchResultDto?> GetCustomerDtoByEmailAsync(string email)
+    {
+        var result = await (from u in _dataContext.Users
+                            join c in _dataContext.Customers on u.Id equals c.Id
+                            where u.Email == email
+                            select new CustomerSearchResultDto
+                            {
+                                CustomerId = c.Id,
+                                FirstName = c.FirstName,
+                                LastName = c.LastName,
+                                Phone = c.Phone,
+                                Address = c.Address,
+                                CreatedDate = c.CreatedAt,
+                                DeletedDate = c.DeletedAt,
+                                UpdatedDate = c.UpdatedAt,
+                                Email = u.Email!
+                            }).FirstOrDefaultAsync();
 
+        return result;
+    }
 }

@@ -193,11 +193,15 @@ public class SellerService : BaseService, ISellerService
             if (updateSellerResult <= 0)
                 throw new Exception(Messages.UpdateError);
 
-            //Delete AppUser
-            var deleteAppUserResult = await DeleteAppUserAsync(sellerId);
-
-            if (!deleteAppUserResult.Success)
-                throw new Exception(deleteAppUserResult.Message);
+            //Delete Appuser
+            var user = await _userManager.FindByIdAsync(sellerId.ToString());
+            if (user != null)
+            {
+                user.IsDeleted = true;
+                var updateResult = await _userManager.UpdateAsync(user);
+                if (!updateResult.Succeeded)
+                    throw new Exception(Messages.DeleteError);
+            }
 
             //Transaction End
             await trx.CommitAsync();
@@ -308,22 +312,6 @@ public class SellerService : BaseService, ISellerService
         await _userManager.AddToRoleAsync(user, CustomRoles.Seller);
 
         return new SuccessDataResult<AppUser>(data: user);
-    }
-    private async Task<IResult> DeleteAppUserAsync(Guid userId)
-    {
-        var user = await _userManager.FindByIdAsync(userId.ToString());
-        if (user == null)
-            return new ErrorResult(Messages.UserNotFound);
-
-
-        var deleteResult = await _userManager.DeleteAsync(user);
-        if (!deleteResult.Succeeded)
-        {
-            var errorMessages = string.Join(" | ", deleteResult.Errors.Select(e => e.Description));
-            return new ErrorResult(errorMessages);
-        }
-
-        return new SuccessResult();
     }
     private async Task<DataResult<Seller>> CreateSellerAsync(RegisterSellerDto model, Guid userId)
     {

@@ -2,24 +2,26 @@
 using Business.Services.Abstract;
 using Core.Constants;
 using Core.Interfaces;
-using Core.Pagination;
 using Core.Utilities.Results;
+using DataAccess;
 using DataAccess.Repositories.Abstract;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Models.DTOs.Auth;
+using Models.DTOs.Customer;
 using Models.Entities.Concrete;
 using Models.Identity;
-using Models.ViewModels.Customer;
 
 namespace Business.Services.Concrete;
-
 public class CustomerService : BaseService, ICustomerService
 {
     private readonly ICustomerRepository _customerRepo;
     private readonly UserManager<AppUser> _userManager;
     private readonly RoleManager<AppRole> _roleManager;
-    public CustomerService(
+    private readonly ApplicationDbContext _context;
+
+    public CustomerService(ApplicationDbContext context,
       IMapper mapper,
       IConfiguration config,
       ICurrentUserService currentUserService,
@@ -31,82 +33,134 @@ public class CustomerService : BaseService, ICustomerService
         _customerRepo = customerRepo;
         _userManager = userManager;
         _roleManager = roleManager;
+        _context = context;
     }
-
-
     public async Task<IResult> RegisterCustomerAsync(RegisterCustomerDto model)
     {
-        // 1. AppUser kontrolü
+        // AppUser check
         var existingUser = await _userManager.FindByEmailAsync(model.Email);
         if (existingUser != null && !existingUser.IsDeleted)
             return new ErrorResult(Messages.AlreadyExistsEmail);
 
-        // 2. AppUser oluşturma
-        var user = new AppUser
+        //Transaction Start
+        var strategy = _context.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async () =>
         {
-            Email = model.Email,
-            UserName = model.Email,
-            PhoneNumber = model.Phone,
-            EmailConfirmed = true
-        };
+            await using var trx = await _context.Database.BeginTransactionAsync();
 
-        var createUserResult = await _userManager.CreateAsync(user, model.Password);
-        if (!createUserResult.Succeeded)
-        {
-            var errors = string.Join(" | ", createUserResult.Errors.Select(e => e.Description));
-            return new ErrorResult(errors);
-        }
+            // Create AppUser 
+            var user = new AppUser
+            {
+                Email = model.Email,
+                UserName = model.FullName,
+                PhoneNumber = model.Phone,
+                EmailConfirmed = true
+            };
 
-        // 3. Rol kontrol & atama
-        if (!await _roleManager.RoleExistsAsync(CustomRoles.Customer))
-            await _roleManager.CreateAsync(new AppRole { Name = CustomRoles.Customer });
+            var createUserResult = await _userManager.CreateAsync(user, model.Password);
+            if (!createUserResult.Succeeded)
+            {
+                var errors = string.Join(" | ", createUserResult.Errors.Select(e => e.Description));
+                throw new Exception(errors);
+            }
 
-        await _userManager.AddToRoleAsync(user, CustomRoles.Customer);
+            // Role assignment
+            if (!await _roleManager.RoleExistsAsync(CustomRoles.Customer))
+                await _roleManager.CreateAsync(new AppRole { Name = CustomRoles.Customer });
 
-        // 4. Customer kontrol
-        var existingCustomer = await _customerRepo.GetByIdAsync(user.Id);
-        if (existingCustomer != null)
-        {
-            await _userManager.DeleteAsync(user); // AppUser'ı manuel sil
-            return new ErrorResult(Messages.AlreadyExistsCustomer);
-        }
+            await _userManager.AddToRoleAsync(user, CustomRoles.Customer);
 
-        // 5. Customer oluşturma
-        var customer = Mapper.Map<Customer>(model);
-        customer.Id = user.Id;
-        customer.CreatedBy = model.FullName;
+            // Create Customer 
+            var customer = Mapper.Map<Customer>(model);
+            customer.Id = user.Id;
+            customer.CreatedBy = model.FullName;
 
-        var createResult = await _customerRepo.CreateAsync(customer);
-        if (createResult <= 0)
-        {
-            await _userManager.DeleteAsync(user); // AppUser'ı manuel silme
-            return new ErrorResult(Messages.CreateError);
-        }
+            var createResult = await _customerRepo.CreateAsync(customer);
+            if (createResult <= 0)
+                throw new Exception(Messages.CreateError);
 
-        return new SuccessResult(Messages.CreateSuccess);
+            //Transaction End
+            await trx.CommitAsync();
+
+            return new SuccessResult(Messages.CreateSuccess);
+        });
     }
-    public async Task<decimal> CountAsync()
+    public async Task<IDataResult<CustomerSearchResultDto>> GetCustomerBySearchAsync(CustomerSearchDto model)
     {
-        return await _customerRepo.CountAsync();
+        //Login Check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorDataResult<CustomerSearchResultDto>(Messages.LoginUnauthorized);
+
+        //Role Check
+        if (CurrentUserService.Role != CustomRoles.Admin)
+            return new ErrorDataResult<CustomerSearchResultDto>(Messages.UnauthorizedAccess);
+
+        //Customer Check
+        CustomerSearchResultDto? dto = null;
+
+        if (!string.IsNullOrWhiteSpace(model.Phone))
+            dto = await _customerRepo.GetCustomerDtoByPhoneAsync(model.Phone);
+        else if (!string.IsNullOrWhiteSpace(model.Email))
+            dto = await _customerRepo.GetCustomerDtoByEmailAsync(model.Email);
+        else
+            return new ErrorDataResult<CustomerSearchResultDto>(Messages.NoFilter);
+
+        if (dto == null)
+            return new ErrorDataResult<CustomerSearchResultDto>(Messages.CustomerNotFound);
+
+        return new SuccessDataResult<CustomerSearchResultDto>(dto);
     }
-    public async Task<IResult> DeleteCustomerAsync(Guid customerId)
+    public async Task<IResult> DeleteCustomerByAdminAsync(Guid customerId)
     {
-        if (!await _customerRepo.ExistsAsync(c => c.Id == customerId && !c.IsDeleted))
+        if (CurrentUserService.Role != CustomRoles.Admin)
+            return new ErrorResult(Messages.UnauthorizedAccess);
+
+        return await SoftDeleteCustomerInternalAsync(customerId);
+    }
+    public async Task<IResult> DeleteOwnCustomerAccountAsync()
+    {
+        if (!CurrentUserService.UserId.HasValue || CurrentUserService.Role != CustomRoles.Customer)
+            return new ErrorResult(Messages.UnauthorizedAccess);
+
+        return await SoftDeleteCustomerInternalAsync(CurrentUserService.UserId.Value);
+    }
+    public async Task<IDataResult<long>> CountAsync()
+    {
+        var count = await _customerRepo.CountAsync();
+        return new SuccessDataResult<long>(count);
+    }
+    private async Task<IResult> SoftDeleteCustomerInternalAsync(Guid customerId)
+    {
+        //Check customer
+        var exists = await _customerRepo.ExistsAsync(c => c.Id == customerId && !c.IsDeleted);
+        if (!exists)
             return new ErrorResult(Messages.CustomerNotFound);
 
-        var deleteResult = await _customerRepo.SoftDeleteAsync(customerId);
+        //Transaction Start
+        var strategy = _context.Database.CreateExecutionStrategy();
 
-        return deleteResult > 0
-            ? new SuccessResult(Messages.DeleteSuccess)
-        : new ErrorResult(Messages.DeleteError);
-    }
-    public async Task<IDataResult<PaginatedList<CustomerListViewModel>>> GetPaginatedCustomerListAsync(string? searchTerm, int page, int pageSize)
-    {
-        var paginated = await _customerRepo.GetPaginatedCustomerDtosAsync(searchTerm, page, pageSize);
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var trx = await _context.Database.BeginTransactionAsync();
 
-        if (!paginated.Items.Any())
-            return new ErrorDataResult<PaginatedList<CustomerListViewModel>>(Messages.EmptyEntityList);
+            //Delete Customer
+            var deleteResult = await _customerRepo.SoftDeleteAsync(customerId);
+            if (deleteResult <= 0)
+                throw new Exception(Messages.DeleteError);
 
-        return new SuccessDataResult<PaginatedList<CustomerListViewModel>>(paginated);
+            //Delete Appuser
+            var user = await _userManager.FindByIdAsync(customerId.ToString());
+            if (user != null)
+            {
+                user.IsDeleted = true;
+                var updateResult = await _userManager.UpdateAsync(user);
+                if (!updateResult.Succeeded)
+                    throw new Exception(Messages.DeleteError);
+            }
+
+            await trx.CommitAsync();
+            return new SuccessResult(Messages.DeleteSuccess);
+        });
     }
 }

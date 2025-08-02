@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Models.DTOs.Auth;
 using Models.DTOs.Category;
+using Models.DTOs.Customer;
 using Models.DTOs.Product;
 using Models.Entities.Concrete;
 using Models.ViewModels.Customer;
@@ -60,9 +61,10 @@ public class MappingProfile : Profile
         CreateMap<Product, UpdateProductDto>().ReverseMap();
         #endregion
 
-        #region Customer for List
-        CreateMap<Customer, CustomerListViewModel>()
-         .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => $"{src.FirstName} {src.LastName}".Trim()));
+        #region Customer Search  
+        CreateMap<Customer, CustomerSearchResultDto>()
+            .ForMember(dest => dest.CustomerId, opt => opt.MapFrom(src => src.Id));
         #endregion
+
     }
 }

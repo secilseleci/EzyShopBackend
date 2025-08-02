@@ -1,12 +1,12 @@
-﻿using Core.Pagination;
+﻿using Models.DTOs.Customer;
 using Models.Entities.Concrete;
-using Models.ViewModels.Customer;
 
 namespace DataAccess.Repositories.Abstract;
 
 public interface ICustomerRepository : IBaseRepository<Customer>
 {
-    Task<decimal> CountAsync();
-    Task<PaginatedList<CustomerListViewModel>> GetPaginatedCustomerDtosAsync(
-   string? searchTerm, int page, int pageSize);
+    Task<long> CountAsync();
+    Task<CustomerSearchResultDto?> GetCustomerDtoByEmailAsync(string email);
+    Task<CustomerSearchResultDto?> GetCustomerDtoByPhoneAsync(string phone);
+
 }

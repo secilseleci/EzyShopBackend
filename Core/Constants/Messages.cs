@@ -90,6 +90,10 @@
         public const string EmptyProductListForCategoryError = "This category does not have any products";
         #endregion
 
+        #region General
+        public const string NoFilter = "Please enter at least one filter ";
+
+        #endregion
 
 
 
