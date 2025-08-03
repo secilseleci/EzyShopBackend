@@ -32,13 +32,6 @@ public class CustomerApiController : BaseApiController
         return ApiResult(result);
     }
 
-    [HttpDelete("me")]
-    [Authorize(Roles = "Customer")]
-    public async Task<IActionResult> DeleteOwnCustomerAccount()
-    {
-        var result = await _customerService.DeleteOwnCustomerAccountAsync();
-        return ApiResult(result);
-    }
     [HttpGet("count")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> CountCustomer()
@@ -46,4 +39,21 @@ public class CustomerApiController : BaseApiController
         var result = await _customerService.CountAsync();
         return ApiResult(result);
     }
+
+    [HttpGet("profile")]
+    [Authorize(Roles = "Customer")]
+    public async Task<IActionResult> GetProfile()
+    {
+        var result = await _customerService.GetOwnProfileAsync();
+        return ApiResult(result);
+    }
+
+    [HttpDelete("me")]
+    [Authorize(Roles = "Customer")]
+    public async Task<IActionResult> DeleteOwnCustomerAccount()
+    {
+        var result = await _customerService.DeleteOwnCustomerAccountAsync();
+        return ApiResult(result);
+    }
+
 }

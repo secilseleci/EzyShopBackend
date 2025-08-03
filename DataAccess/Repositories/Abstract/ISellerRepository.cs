@@ -8,4 +8,5 @@ public interface ISellerRepository : IBaseRepository<Seller>
 {
     Task<Seller?> GetActiveSellerByUserIdAsync(Guid userId);
     Task<PaginatedList<SellerListItemDto>> GetFilteredSellerListAsync(SellerFilterDto filter);
+    Task<SellerProfileDto?> GetOwnProfileAsync(Guid sellerId);
 }

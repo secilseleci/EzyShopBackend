@@ -281,6 +281,23 @@ public class SellerService : BaseService, ISellerService
     }
     #endregion
 
+    #region Profile Seller
+    public async Task<IDataResult<SellerProfileDto>> GetOwnProfileAsync()
+    {
+        if (!CurrentUserService.UserId.HasValue || CurrentUserService.Role != CustomRoles.Seller)
+            return new ErrorDataResult<SellerProfileDto>(Messages.UnauthorizedAccess);
+
+        var userId = CurrentUserService.UserId.Value;
+
+        var dto = await _sellerRepo.GetOwnProfileAsync(userId);
+        if (dto == null)
+            return new ErrorDataResult<SellerProfileDto>(Messages.SellerNotFound);
+
+        return new SuccessDataResult<SellerProfileDto>(dto);
+    }
+
+    #endregion
+
     #region Private Methods
     private async Task<DataResult<AppUser>> CreateAppUserAsync(RegisterSellerDto model)
     {

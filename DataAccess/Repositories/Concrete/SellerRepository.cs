@@ -1,6 +1,7 @@
 ﻿using Core.Pagination;
 using DataAccess.Repositories.Abstract;
 using Microsoft.EntityFrameworkCore;
+using Models.DTOs.Customer;
 using Models.DTOs.Seller;
 using Models.Entities.Concrete;
 
@@ -13,7 +14,6 @@ public class SellerRepository(ApplicationDbContext context) : BaseRepository<Sel
         var result = await GetWhereAsync(s => s.Id == userId && s.IsActive);      
             return result?.FirstOrDefault();
     }
-
     public async Task<PaginatedList<SellerListItemDto>> GetFilteredSellerListAsync(SellerFilterDto filter)
     {
         var query = from s in _dataContext.Sellers
@@ -64,6 +64,31 @@ public class SellerRepository(ApplicationDbContext context) : BaseRepository<Sel
             .ToListAsync();
 
         return new PaginatedList<SellerListItemDto>(items, totalCount, filter.Page, filter.PageSize);
+    }
+    public async Task<SellerProfileDto?> GetOwnProfileAsync(Guid sellerId)
+    {
+        var result = await (from seller in _dataContext.Sellers
+                            join user in _dataContext.Users on seller.Id equals user.Id
+                            join shop in _dataContext.Shops on seller.Id equals shop.SellerId
+                            where seller.Id == sellerId && !seller.IsDeleted
+                            select new SellerProfileDto
+                            {
+                                SellerId = seller.Id,
+                                FirstName = seller.FirstName,
+                                LastName = seller.LastName,
+                                Phone = user.PhoneNumber!,
+                                Email = user.Email!,
+                                Address = shop.Address,
+                                ShopName=shop.Name,
+                                TaxNumber=shop.TaxNumber,
+                                CreatedDate = seller.CreatedAt,
+                                DeletedDate = seller.DeletedAt,
+                                UpdatedDate = seller.UpdatedAt
+                            })
+                           .AsNoTracking()
+                           .FirstOrDefaultAsync();
+
+        return result;
     }
 
 }

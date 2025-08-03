@@ -23,7 +23,7 @@ public class ProductApiController : BaseApiController
     public async Task<IActionResult> Create(CreateProductDto dto)
     {
         var result = await _productService.CreateProductAsync(dto);
-        return result.Success ? Ok(result) : BadRequest(result);
+        return ApiResult(result);
     }
 
 
@@ -32,7 +32,7 @@ public class ProductApiController : BaseApiController
     public async Task<IActionResult> Update(UpdateProductDto dto)
     {
         var result = await _productService.UpdateProductAsync(dto);
-        return result.Success ? Ok(result) : BadRequest(result);
+        return ApiResult(result);
     }
 
 
@@ -41,7 +41,7 @@ public class ProductApiController : BaseApiController
     public async Task<IActionResult> Delete(Guid productId)
     {
         var result = await _productService.DeleteProductAsync(productId);
-        return result.Success ? Ok(result) : BadRequest(result);
+        return ApiResult(result);
     }
 
 
@@ -50,7 +50,7 @@ public class ProductApiController : BaseApiController
     public async Task<IActionResult> GetDetails(Guid productId)
     {
         var result = await _productService.GetProductDetailsForSellerAsync(productId);
-        return result.Success ? Ok(result) : NotFound(result);
+        return ApiResult(result);
     }
 
 
@@ -59,7 +59,7 @@ public class ProductApiController : BaseApiController
     public async Task<IActionResult> Deactivate(Guid productId)
     {
         var result = await _productService.DeactivateProductAsync(productId);
-        return result.Success ? Ok(result) : BadRequest(result);
+        return ApiResult(result);
     }
 
 
@@ -68,7 +68,7 @@ public class ProductApiController : BaseApiController
     public async Task<IActionResult> Reactivate(Guid productId, int stock)
     {
         var result = await _productService.ReactivateProductAsync(productId, stock);
-        return result.Success ? Ok(result) : BadRequest(result);
+        return ApiResult(result);
     }
 
 
@@ -77,7 +77,7 @@ public class ProductApiController : BaseApiController
     public async Task<IActionResult> GetList([FromBody] ProductFilterForSellerViewModel model)
     {
         var result = await _productService.GetProductsAsync(model);
-        return result.Success ? Ok(result) : BadRequest(result);
+        return ApiResult(result);
     }
 
     [Authorize(Roles = CustomRoles.Customer)]
@@ -85,14 +85,14 @@ public class ProductApiController : BaseApiController
     public async Task<IActionResult> GetDetailsProduct(Guid productId)
     {
         var result = await _productService.GetProductDetailsForCustomerAsync(productId);
-        return result.Success ? Ok(result) : NotFound(result);
+        return ApiResult(result);
     }
 
     [HttpPost("list-public")]
     public async Task<IActionResult> GetListProduct([FromBody] ProductFilterViewModel model)
     {
         var result = await _productService.GetFilteredProductsAsync(model);
-        return result.Success ? Ok(result) : BadRequest(result);
+        return ApiResult(result);
     }
 }
 

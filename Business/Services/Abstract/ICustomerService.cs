@@ -10,4 +10,5 @@ public interface ICustomerService
     Task<IResult> DeleteCustomerByAdminAsync(Guid customerId);
     Task<IResult> DeleteOwnCustomerAccountAsync();
     Task<IDataResult<long>> CountAsync();
+    Task<IDataResult<CustomerSearchResultDto>> GetOwnProfileAsync();
 }

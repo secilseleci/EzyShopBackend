@@ -130,6 +130,19 @@ public class CustomerService : BaseService, ICustomerService
         var count = await _customerRepo.CountAsync();
         return new SuccessDataResult<long>(count);
     }
+    public async Task<IDataResult<CustomerSearchResultDto>> GetOwnProfileAsync()
+    {
+        if (!CurrentUserService.UserId.HasValue || CurrentUserService.Role != CustomRoles.Customer)
+            return new ErrorDataResult<CustomerSearchResultDto>(Messages.UnauthorizedAccess);
+
+        var userId = CurrentUserService.UserId.Value;
+
+        var dto = await _customerRepo.GetOwnProfileAsync(userId);
+        if (dto == null)
+            return new ErrorDataResult<CustomerSearchResultDto>(Messages.CustomerNotFound);
+
+        return new SuccessDataResult<CustomerSearchResultDto>(dto);
+    }
     private async Task<IResult> SoftDeleteCustomerInternalAsync(Guid customerId)
     {
         //Check customer

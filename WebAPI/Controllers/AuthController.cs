@@ -2,6 +2,7 @@
 using Business.Services.Abstract;
 using Core.Constants;
 using Core.Interfaces;
+using Core.Utilities.Results;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -47,11 +48,11 @@ public class AuthController : BaseApiController
     {
         var user = await UserManager.FindByEmailAsync(model.Email);
         if (user == null || user.IsDeleted)
-            return Unauthorized(new { success = false, message = Messages.UserNotFound });
+            return ApiResult(new ErrorDataResult<LoginResponseViewModel>(Messages.UserNotFound));
 
         var isPasswordValid = await UserManager.CheckPasswordAsync(user, model.Password);
         if (!isPasswordValid)
-            return Unauthorized(new { success = false, message = Messages.LoginInvalidCredentials });
+            return ApiResult(new ErrorDataResult<LoginResponseViewModel>(Messages.LoginInvalidCredentials));
 
         var roles = await UserManager.GetRolesAsync(user);
         var token = _tokenService.CreateToken(user, roles);
@@ -64,9 +65,8 @@ public class AuthController : BaseApiController
             Roles = roles
         };
 
-        return Ok(new { success = true, message = Messages.LoginSuccess, data = response });
+        return ApiResult(new SuccessDataResult<LoginResponseViewModel>(response, Messages.LoginSuccess));
     }
-
 
     [HttpPost("register-customer")]
     public async Task<IActionResult> RegisterCustomer([FromBody] RegisterCustomerDto model)
@@ -89,45 +89,37 @@ public class AuthController : BaseApiController
 
         return ApiResult(result);
     }
+    
     [Authorize]
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto model)
     {
         if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+            return ApiResult(new ErrorResult("Invalid model."));
 
-        // 1. Kullanıcı kimliği alınır
         var userId = _currentUserService.UserId;
         if (userId == null)
-            return Unauthorized();
+            return ApiResult(new ErrorResult(Messages.LoginUnauthorized));
 
-        // 1. Kullanıcı bulunur
         var user = await UserManager.FindByIdAsync(userId.Value.ToString());
         if (user == null || user.IsDeleted)
-            return NotFound(Messages.UserNotFound);
+            return ApiResult(new ErrorResult(Messages.UserNotFound));
 
-        // 3. Eski şifre doğrulanır
         var oldPasswordValid = await UserManager.CheckPasswordAsync(user, model.OldPassword);
         if (!oldPasswordValid)
-            return BadRequest(Messages.OldPasswordError);
+            return ApiResult(new ErrorResult(Messages.OldPasswordError));
 
-        // 4. Şifre değiştirme işlemi
         var result = await UserManager.ChangePasswordAsync(user, model.OldPassword, model.NewPassword);
         if (!result.Succeeded)
         {
-            var errors = result.Errors.Select(e => e.Description);
-            return BadRequest(new { Errors = errors });
+            var errorMsg = string.Join(" | ", result.Errors.Select(e => e.Description));
+            return ApiResult(new ErrorResult(errorMsg));
         }
 
-        // 5. Şifre başarıyla değiştiyse yeni token üret:
         var roles = await UserManager.GetRolesAsync(user);
         var newToken = _tokenService.CreateToken(user, roles);
 
-        return Ok(new
-        {
-            Message = Messages.PasswordChangeSuccess,
-            NewToken = newToken
-        });
+        return ApiResult(new SuccessDataResult<string>(newToken, Messages.PasswordChangeSuccess));
     }
 }
 

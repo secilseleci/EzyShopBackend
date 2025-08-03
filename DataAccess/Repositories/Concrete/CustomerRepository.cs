@@ -52,4 +52,27 @@ public class CustomerRepository(ApplicationDbContext context) : BaseRepository<C
 
         return result;
     }
+    public async Task<CustomerSearchResultDto?> GetOwnProfileAsync(Guid customerId)
+    {
+        var result = await (from customer in _dataContext.Customers
+                            join user in _dataContext.Users
+                                on customer.Id equals user.Id
+                            where customer.Id == customerId && !customer.IsDeleted
+                            select new CustomerSearchResultDto
+                            {
+                                CustomerId = customer.Id,
+                                FirstName = customer.FirstName,
+                                LastName = customer.LastName,
+                                Phone = user.PhoneNumber!,
+                                Email = user.Email!,
+                                Address = customer.Address,
+                                CreatedDate = customer.CreatedAt,
+                                DeletedDate = customer.DeletedAt,
+                                UpdatedDate = customer.UpdatedAt
+                            })
+                           .AsNoTracking()
+                           .FirstOrDefaultAsync();
+
+        return result;
+    }
 }
