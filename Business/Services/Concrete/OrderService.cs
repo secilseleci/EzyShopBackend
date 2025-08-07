@@ -3,12 +3,14 @@ using Business.Services.Abstract;
 using Core.Constants;
 using Core.Interfaces;
 using Core.Utilities.Results;
+using DataAccess;
 using DataAccess.Repositories.Abstract;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.CodeAnalysis;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Models.DTOs.Order;
 using Models.DTOs.OrderItem;
 using Models.Entities.Concrete;
-using Models.Identity;
 using Models.ViewModels.Cart;
 using static Models.Entities.Concrete.OrderItem;
 
@@ -16,52 +18,133 @@ namespace Business.Services.Concrete;
 
 public class OrderService : BaseService, IOrderService
 {
+    private readonly ApplicationDbContext _context;
     private readonly IOrderRepository _orderRepo;
     private readonly IOrderItemRepository _orderItemRepo;
     private readonly IProductRepository _productRepo;
     private readonly ICustomerRepository _customerRepo;
 
-    public OrderService(
+    public OrderService(ApplicationDbContext context,
           ICustomerRepository customerRepo,
           IProductRepository productRepo,
           IOrderRepository orderRepo,
           IOrderItemRepository orderItemRepo,
           IMapper mapper,
           IConfiguration config,
-          UserManager<AppUser> userManager,
-          RoleManager<AppRole> roleManager,
           ICurrentUserService currentUserService) : base(mapper, config, currentUserService)
     {
         _customerRepo = customerRepo;
         _orderRepo = orderRepo;
         _orderItemRepo = orderItemRepo;
         _productRepo = productRepo;
+        _context = context;
     }
-    public async Task<IDataResult<Order>> AddToCartAsync(Guid productId)
+    public async Task<IResult> AddToCartAsync(AddToCartDto model)
+    {
+        var (isValid, error, customer, product) = await ValidateCustomerAndProductAsync(model.ProductId);
+        if (!isValid)
+            return new ErrorResult(error!);
+
+        if (product!.Stock <= 0)
+            return new ErrorResult(Messages.StockError);
+
+        //Transaction Start
+        var strategy = _context.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var trx = await _context.Database.BeginTransactionAsync();
+
+            var order = await GetOrCreateCartOrThrowAsync(customer!.Id);
+            await AddOrUpdateOrderItemOrThrowAsync(order, product, model.Count);
+            await UpdateTotalAmountOrThrowAsync(order);
+
+            //Transaction End
+            await trx.CommitAsync();
+            return new SuccessResult(Messages.ProductAddedSuccess);
+        });
+    }
+
+    private async Task<(bool isValid, string? errorMessage, Customer? customer, Product? product)>
+    ValidateCustomerAndProductAsync(Guid productId)
     {
         if (!CurrentUserService.UserId.HasValue)
-            return new ErrorDataResult<Order>(Messages.LoginUnauthorized);
+            return (false, Messages.LoginUnauthorized, null, null);
+
+        if (CurrentUserService.Role != CustomRoles.Customer)
+            return (false, Messages.UnauthorizedAccess, null, null);
 
         var customerId = CurrentUserService.UserId.Value;
 
-        if (!await CheckCustomerExistsAsync(customerId))
-            return new ErrorDataResult<Order>(Messages.CustomerNotFound);
+        var customer = await _customerRepo.GetByIdAsync(customerId);
+        if (customer == null)
+            return (false, Messages.CustomerNotFound, null, null);
 
-        using var transaction = await _orderRepo.BeginTransactionAsync();
+        var product = await _productRepo.GetByIdAsync(productId);
 
-        var order = await GetOrCreateCartAsync(customerId);
+        if (product == null)
+            return (false, Messages.ProductNotFound, null, null);
 
-        var itemResult = await AddOrUpdateOrderItemAsync(order.Data, productId);
+        return (true, null, customer, product);
+    }
 
-        if (!itemResult.Success)
+    private async Task<Order> GetOrCreateCartOrThrowAsync(Guid customerId)
+    {
+        var existingOrder = await _orderRepo.GetIncartOrderByCustomerIdAsync(customerId);
+        if (existingOrder != null)
+            return existingOrder;
+
+        var newOrder = await _orderRepo.CreateOrderAsync(customerId);
+        if (newOrder == null)
+            throw new Exception(Messages.CreateError);
+
+        return newOrder;
+    }
+    private async Task UpdateTotalAmountOrThrowAsync(Order order)
+    {
+        var orderItems = await _orderItemRepo.GetWhereAsync(i => i.OrderId == order.Id && !i.IsDeleted);
+        order.TotalAmount = orderItems.Sum(i => i.TotalPrice);
+
+        var result = await _orderRepo.UpdateAsync(order);
+        if (result == 0)
+            throw new Exception(Messages.ProductAddedError);
+    }
+    private async Task AddOrUpdateOrderItemOrThrowAsync(Order order, Product product, int count)
+    {
+        var existingItem = await _orderItemRepo.GetOrderItemByOrderandProductId(order.Id, product.Id);
+
+        if (existingItem != null)
         {
-            await transaction.RollbackAsync();
-            return new ErrorDataResult<Order>(message: itemResult.Message);
+            var newCount = existingItem.Count + count;
+            if (newCount > product.Stock)
+                throw new Exception(Messages.StockError);
+
+            existingItem.Count = newCount;
+            var updated = await _orderItemRepo.UpdateAsync(existingItem);
+            if (updated <= 0)
+                throw new Exception(Messages.UpdateError);
+
+            return;
         }
 
-        await transaction.CommitAsync();
+        if (count > product.Stock)
+            throw new Exception(Messages.StockError);
 
-        return new SuccessDataResult<Order>(order.Data, message: itemResult.Message);
+        var newItem = new OrderItem
+        {
+            ProductId = product.Id,
+            OrderId = order.Id,
+            Count = count,
+            ProductName = product.Name,
+            ProductPrice = product.Price,
+            Color = product.Color,
+            ImageUrl = product.ImageUrl,
+            Status = OrderItemStatus.InCart,
+        };
+
+        var created = await _orderItemRepo.CreateAsync(newItem);
+        if (created <= 0)
+            throw new Exception(Messages.CreateError);
     }
 
     public async Task<IDataResult<Order?>> GetInCartOrderAsync()
@@ -120,68 +203,4 @@ public class OrderService : BaseService, IOrderService
         return !hasItems;
     }
 
-
-    private async Task<bool> CheckCustomerExistsAsync(Guid customerId)
-  => await _customerRepo.ExistsAsync(c => c.Id == customerId);
-    private async Task<IDataResult<Order>> GetOrCreateCartAsync(Guid customerId)
-    {
-
-        var existingOrder = await _orderRepo.GetIncartOrderByCustomerIdAsync(customerId);
-        if (existingOrder != null)
-            return new SuccessDataResult<Order>(existingOrder);
-
-        var newOrder = await _orderRepo.CreateOrderAsync(customerId);
-        if (newOrder == null)
-            return new ErrorDataResult<Order>(message: Messages.CreateError);
-
-        return new SuccessDataResult<Order>(newOrder);
-    }
-    private async Task<IResult> AddOrUpdateOrderItemAsync(Order order, Guid productId)
-    {
-        var product = await _productRepo.GetByIdAsync(productId);
-        if (product == null)
-            return new ErrorResult(Messages.ProductNotFound);
-
-        if (product.Stock <= 0)
-            return new ErrorResult(Messages.StockError);
-
-        var orderItemResult = await _orderItemRepo.GetOrderItemByOrderandProductId(order.Id, productId);
-
-        if (orderItemResult != null)
-        {
-            var newCount = orderItemResult.Count + 1;
-
-
-            if (newCount > product.Stock)
-                return new ErrorResult(Messages.StockError);
-
-            orderItemResult.Count = newCount;
-
-            var updateResult = await _orderItemRepo.UpdateAsync(orderItemResult);
-            if (updateResult <= 0)
-            {
-                return new ErrorResult(message: Messages.UpdateError);
-            }
-        }
-        else
-        {
-            var neworderItem = new OrderItem
-            {
-                ProductId = productId,
-                OrderId = order.Id,
-                Count = 1,
-                ProductName = product.Name,
-                ProductPrice = product.Price,
-                Color = product.Color,
-                ImageUrl = product.ImageUrl,
-                Status = OrderItemStatus.InCart,
-            };
-
-            var createResult = await _orderItemRepo.CreateAsync(neworderItem);
-            if (createResult <= 0)
-                return new ErrorResult(message: Messages.CreateError);
-        }
-
-        return new SuccessResult(message: Messages.ProductAddedSuccess);
-    }
 }

@@ -7,17 +7,6 @@ namespace DataAccess.Repositories.Concrete;
 
 public class OrderItemRepository(ApplicationDbContext context) : BaseRepository<OrderItem>(context), IOrderItemRepository
 {
-    public async Task<Guid> CreateOrderItemAsync(Guid orderId, Guid productId)
-    {
-        var orderItem = new OrderItem()
-        {
-            OrderId = orderId,
-            ProductId = productId
-        };
-   
-        await _dataContext.AddAsync(orderItem);
-        return orderItem.Id;
-    }
 
     public async Task<IEnumerable<OrderItemDto>> GetOrderItemsAsync(Guid orderId)
     {

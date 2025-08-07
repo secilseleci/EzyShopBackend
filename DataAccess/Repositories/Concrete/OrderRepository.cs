@@ -19,6 +19,4 @@ public class OrderRepository(ApplicationDbContext context) : BaseRepository<Orde
         .Include(o => o.OrderItems)
         .FirstOrDefaultAsync(o => o.CustomerId == customerId && o.Status == OrderStatus.InCart );
     }
-
-    
 }
