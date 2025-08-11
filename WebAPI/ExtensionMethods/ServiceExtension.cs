@@ -111,7 +111,6 @@ public static class ServiceExtension
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IShopService, ShopService>();
         services.AddScoped<IOrderService, OrderService>();
-        services.AddScoped<IOrderItemService, OrderItemService>();
     }
 }
 

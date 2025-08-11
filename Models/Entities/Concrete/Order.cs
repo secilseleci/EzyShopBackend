@@ -6,6 +6,7 @@ public class Order : BaseEntity
     public Order()
     {
         Status = OrderStatus.InCart;
+        IsActive = true;
     }
     
     public Guid CustomerId { get; set; }

@@ -9,9 +9,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Models.DTOs.Order;
-using Models.DTOs.OrderItem;
 using Models.Entities.Concrete;
-using Models.ViewModels.Cart;
 using static Models.Entities.Concrete.OrderItem;
 
 namespace Business.Services.Concrete;
@@ -41,10 +39,16 @@ public class OrderService : BaseService, IOrderService
     }
     public async Task<IResult> AddToCartAsync(AddToCartDto model)
     {
-        var (isValid, error, customer, product) = await ValidateCustomerAndProductAsync(model.ProductId);
+        //Customer check
+        var (isValid, error, customer) = await ValidateCustomerAsync();
         if (!isValid)
             return new ErrorResult(error!);
 
+        //Product check
+        var product = await _productRepo.GetByIdAsync(model.ProductId);
+
+        if (product == null)
+            return new ErrorResult(Messages.ProductNotFound);
         if (product!.Stock <= 0)
             return new ErrorResult(Messages.StockError);
 
@@ -59,35 +63,101 @@ public class OrderService : BaseService, IOrderService
             await AddOrUpdateOrderItemOrThrowAsync(order, product, model.Count);
             await UpdateTotalAmountOrThrowAsync(order);
 
-            //Transaction End
             await trx.CommitAsync();
+            //Transaction End
+
             return new SuccessResult(Messages.ProductAddedSuccess);
         });
     }
-
-    private async Task<(bool isValid, string? errorMessage, Customer? customer, Product? product)>
-    ValidateCustomerAndProductAsync(Guid productId)
+    public async Task<IResult> RemoveCartAsync()
     {
-        if (!CurrentUserService.UserId.HasValue)
-            return (false, Messages.LoginUnauthorized, null, null);
+        //Customer check
+        var (isValid, error, customer) = await ValidateCustomerAsync();
+        if (!isValid)
+            return new ErrorResult(error!);
 
-        if (CurrentUserService.Role != CustomRoles.Customer)
-            return (false, Messages.UnauthorizedAccess, null, null);
+        //Order check
+        var existingOrder = await _orderRepo.GetIncartOrderByCustomerIdAsync(customer!.Id);
+        if (existingOrder == null)
+            return new ErrorResult(Messages.OrderNotFound);
 
-        var customerId = CurrentUserService.UserId.Value;
+        //Orderitems check
+        var existingOrderItems = await _orderItemRepo.GetWhereAsync(i => i.OrderId == existingOrder.Id);
 
-        var customer = await _customerRepo.GetByIdAsync(customerId);
-        if (customer == null)
-            return (false, Messages.CustomerNotFound, null, null);
+        //Transaction Start
+        var strategy = _context.Database.CreateExecutionStrategy();
 
-        var product = await _productRepo.GetByIdAsync(productId);
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var trx = await _context.Database.BeginTransactionAsync();
 
-        if (product == null)
-            return (false, Messages.ProductNotFound, null, null);
+            await _orderItemRepo.SoftDeleteRangeAsync(existingOrderItems);
 
-        return (true, null, customer, product);
+            var deleteResult = await _orderRepo.SoftDeleteCartOnlyAsync(existingOrder.Id);
+            if (deleteResult <= 0) throw new Exception(Messages.DeleteError);
+
+            await trx.CommitAsync();
+            //Transaction end  
+            return new SuccessResult(Messages.DeleteSuccess);
+        });
+    }
+    public async Task<IDataResult<CartDto>> GetCartPageAsync()
+    {
+        // (1-3) Login + Role + CustomerId
+        var (isValid, error, customer) = await ValidateCustomerAsync();
+        if (!isValid)
+            return new ErrorDataResult<CartDto>(error!);
+
+        // (4) InCart order?
+        var existingOrder = await _orderRepo.GetIncartOrderByCustomerIdAsync(customer!.Id);
+        if (existingOrder is null)
+        {
+            // GET / empty cart
+            return new SuccessDataResult<CartDto>(new CartDto
+            {
+                OrderId = Guid.Empty,
+                TotalAmount = 0,
+                TotalItemCount = 0,
+                DistinctShopCount = 0,
+                Shops = []
+            });
+        }
+
+        var rows = await _orderRepo.GetCartFlatRowsByOrderIdAsync(existingOrder.Id);
+        var shops = rows
+      .GroupBy(r => new { r.ShopId, r.ShopName })
+      .Select(g => new CartShopDto
+      {
+          ShopId = g.Key.ShopId,
+          ShopName = g.Key.ShopName,
+          Subtotal = g.Sum(i => i.UnitPrice * i.Count),
+          Items = g.Select(i => new CartItemDto
+          {
+              OrderItemId = i.OrderItemId,
+              ProductId = i.ProductId,
+              ProductName = i.ProductName,
+              UnitPrice = i.UnitPrice,
+              Count = i.Count,
+              LineTotal = i.UnitPrice * i.Count,
+              ImageUrl = i.ImageUrl,
+              Color = i.Color
+          }).ToList()
+      })
+      .ToList();
+
+        var dto = new CartDto
+        {
+            OrderId = existingOrder.Id,
+            TotalAmount = shops.Sum(s => s.Subtotal),
+            TotalItemCount = shops.Sum(s => s.Items.Count),
+            DistinctShopCount = shops.Count,
+            Shops = shops
+        };
+
+        return new SuccessDataResult<CartDto>(dto);
     }
 
+    
     private async Task<Order> GetOrCreateCartOrThrowAsync(Guid customerId)
     {
         var existingOrder = await _orderRepo.GetIncartOrderByCustomerIdAsync(customerId);
@@ -111,7 +181,8 @@ public class OrderService : BaseService, IOrderService
     }
     private async Task AddOrUpdateOrderItemOrThrowAsync(Order order, Product product, int count)
     {
-        var existingItem = await _orderItemRepo.GetOrderItemByOrderandProductId(order.Id, product.Id);
+         var existingItem = await _orderItemRepo
+            .GetOrderItemByOrderAndProductId(order.Id, product.Id);
 
         if (existingItem != null)
         {
@@ -120,6 +191,8 @@ public class OrderService : BaseService, IOrderService
                 throw new Exception(Messages.StockError);
 
             existingItem.Count = newCount;
+            existingItem.IsActive = true;
+
             var updated = await _orderItemRepo.UpdateAsync(existingItem);
             if (updated <= 0)
                 throw new Exception(Messages.UpdateError);
@@ -127,7 +200,7 @@ public class OrderService : BaseService, IOrderService
             return;
         }
 
-        if (count > product.Stock)
+         if (count > product.Stock)
             throw new Exception(Messages.StockError);
 
         var newItem = new OrderItem
@@ -135,72 +208,34 @@ public class OrderService : BaseService, IOrderService
             ProductId = product.Id,
             OrderId = order.Id,
             Count = count,
-            ProductName = product.Name,
-            ProductPrice = product.Price,
+            ProductName = product.Name,   // snapshot
+            ProductPrice = product.Price,  // snapshot
             Color = product.Color,
             ImageUrl = product.ImageUrl,
             Status = OrderItemStatus.InCart,
+            IsActive = true
         };
 
         var created = await _orderItemRepo.CreateAsync(newItem);
         if (created <= 0)
             throw new Exception(Messages.CreateError);
     }
-
-    public async Task<IDataResult<Order?>> GetInCartOrderAsync()
+    private async Task<(bool isValid, string? errorMessage, Customer? customer)> ValidateCustomerAsync()
     {
         if (!CurrentUserService.UserId.HasValue)
-            return new ErrorDataResult<Order?>(Messages.LoginUnauthorized);
+            return (false, Messages.LoginUnauthorized, null);
 
-        var order = await _orderRepo.GetIncartOrderByCustomerIdAsync(CurrentUserService.UserId.Value);
-
-        return new SuccessDataResult<Order?>(order);
-
-    }
-    public async Task<IDataResult<CartPageViewModel>> GetCartPageAsync()
-    {
-        if (!CurrentUserService.UserId.HasValue)
-            return new ErrorDataResult<CartPageViewModel>(Messages.LoginUnauthorized);
+        if (CurrentUserService.Role != CustomRoles.Customer)
+            return (false, Messages.UnauthorizedAccess, null);
 
         var customerId = CurrentUserService.UserId.Value;
 
-        if (!await _customerRepo.ExistsAsync(c => c.Id == customerId))
-            return new ErrorDataResult<CartPageViewModel>(Messages.CustomerNotFound);
+        var customer = await _customerRepo.GetByIdAsync(customerId);
+        if (customer == null)
+            return (false, Messages.CustomerNotFound, null);
 
-        var order = await _orderRepo.GetIncartOrderByCustomerIdAsync(customerId);
-        if (order == null || !order.OrderItems.Any())
-        {
-            return new SuccessDataResult<CartPageViewModel>(
-                new CartPageViewModel { OrderItems = new List<OrderItemDto>() });
-        }
-
-        var items = await _orderItemRepo.GetOrderItemsAsync(order.Id);
-
-        var total = items.Sum(x => x.Count * x.ProductPrice);
-
-        var vm = new CartPageViewModel
-        {
-            TotalAmount = total,
-            OrderItems = items.ToList()
-        };
-
-        return new SuccessDataResult<CartPageViewModel>(vm);
+        return (true, null, customer);
     }
-    public async Task<bool> IsCartEmptyAsync()
-    {
-        if (!CurrentUserService.UserId.HasValue)
-            return true;
 
-        var customerId = CurrentUserService.UserId.Value;
-
-        var order = await _orderRepo.GetIncartOrderByCustomerIdAsync(customerId);
-        if (order == null)
-            return true;
-
-        var items = await _orderItemRepo.GetOrderItemsAsync(order.Id);
-        bool hasItems = items.Any();
-
-        return !hasItems;
-    }
 
 }
