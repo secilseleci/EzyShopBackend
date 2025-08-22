@@ -28,7 +28,7 @@ public class CategoryService : BaseService, ICategoryService
 
     public async Task<IResult> CreateCategoryAsync(CategoryBasicDto model)
     {
-        if (await _categoryRepo.ExistsAsync(c => c.Name.ToLower() == model.Name.ToLower() && !c.IsDeleted))
+        if (await _categoryRepo.ExistsAsync(c => c.Name.ToLower() == model.Name.ToLower()))
             return new ErrorResult(Messages.AlreadyExists);
 
         var createResult = await _categoryRepo.CreateAsync(Mapper.Map<Category>(model));
@@ -46,7 +46,7 @@ public class CategoryService : BaseService, ICategoryService
 
         var isNameTaken = await _categoryRepo.ExistsAsync(c =>
         c.Name.ToLower() == model.Name.ToLower() &&
-        c.Id != model.Id && !c.IsDeleted);
+        c.Id != model.Id);
 
         if (isNameTaken)
             return new ErrorResult(Messages.AlreadyExists);
@@ -63,7 +63,7 @@ public class CategoryService : BaseService, ICategoryService
 
     public async Task<IResult> DeleteCategoryAsync(Guid categoryId)
     {
-        if (!await _categoryRepo.ExistsAsync(c => c.Id == categoryId && !c.IsDeleted))
+        if (!await _categoryRepo.ExistsAsync(c => c.Id == categoryId))
             return new ErrorResult(Messages.CategoryNotFound);
 
         var deleteResult = await _categoryRepo.SoftDeleteAsync(categoryId);

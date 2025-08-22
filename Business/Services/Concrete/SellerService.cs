@@ -44,7 +44,7 @@ public class SellerService : BaseService, ISellerService
     public async Task<IDataResult<Seller>> CreateSellerApplicationAsync(RegisterSellerDto model)
     {
         //Seller Existing Control
-        var phoneExists = await _sellerRepo.ExistsAsync(s => s.Phone == model.Phone && !s.IsDeleted);
+        var phoneExists = await _sellerRepo.ExistsAsync(s => s.Phone == model.Phone);
 
         if (phoneExists)
         {

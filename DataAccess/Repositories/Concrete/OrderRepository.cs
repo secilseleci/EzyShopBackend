@@ -4,13 +4,13 @@ using Models.DTOs.Order;
 using Models.Entities.Concrete;
 
 namespace DataAccess.Repositories.Concrete;
-
 public class OrderRepository(ApplicationDbContext context) : BaseRepository<Order>(context), IOrderRepository
 {
     public async Task<Order> CreateOrderAsync(Guid customerId)
     {
         var order = new Order { CustomerId = customerId, Status = OrderStatus.InCart ,IsActive=true};
         await _dataContext.AddAsync(order);
+        await _dataContext.SaveChangesAsync();
         return order;
     }
     public async Task<Order?> GetIncartOrderByCustomerIdAsync(Guid customerId)
@@ -58,5 +58,4 @@ public class OrderRepository(ApplicationDbContext context) : BaseRepository<Orde
             .AsNoTracking()
             .ToListAsync();
     }
-
 }

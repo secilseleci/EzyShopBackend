@@ -9,11 +9,9 @@ using Models.DTOs.Auth;
 using Models.Entities.Concrete;
 
 namespace Business.Services.Concrete;
-
 public class ShopService : BaseService, IShopService
 {
     private readonly IShopRepository _shopRepo;
-
     public ShopService(
       IMapper mapper,
       IConfiguration config,
@@ -125,11 +123,11 @@ public class ShopService : BaseService, IShopService
     #region Check Shop Exist
     public async Task<IResult> CheckShopExistsAsync(string name, string taxNumber)
     {
-        var shopNameExists = await _shopRepo.ExistsAsync(s => s.Name == name && !s.IsDeleted);
+        var shopNameExists = await _shopRepo.ExistsAsync(s => s.Name == name);
         if (shopNameExists)
             return new ErrorResult(Messages.AlreadyExistsShopName);
 
-        var taxNumberExists = await _shopRepo.ExistsAsync(s => s.TaxNumber == taxNumber && !s.IsDeleted);
+        var taxNumberExists = await _shopRepo.ExistsAsync(s => s.TaxNumber == taxNumber);
         if (taxNumberExists)
             return new ErrorResult(Messages.AlreadyExistsTaxNumber);
 

@@ -4,9 +4,8 @@ using Models.DTOs.Category;
 using Models.DTOs.Customer;
 using Models.DTOs.Product;
 using Models.Entities.Concrete;
-using Models.ViewModels.Customer;
 
-namespace WebUI.Mappings.AutoMapper;
+namespace WebAPI.Mappings.AutoMapper;
 
 public class MappingProfile : Profile
 {

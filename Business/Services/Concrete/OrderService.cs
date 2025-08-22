@@ -5,7 +5,6 @@ using Core.Interfaces;
 using Core.Utilities.Results;
 using DataAccess;
 using DataAccess.Repositories.Abstract;
-using Microsoft.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Models.DTOs.Order;
@@ -149,7 +148,7 @@ public class OrderService : BaseService, IOrderService
         {
             OrderId = existingOrder.Id,
             TotalAmount = shops.Sum(s => s.Subtotal),
-            TotalItemCount = shops.Sum(s => s.Items.Count),
+            TotalItemCount = shops.Sum(s => s.Items.Sum(i => i.Count)),
             DistinctShopCount = shops.Count,
             Shops = shops
         };

@@ -146,7 +146,7 @@ public class CustomerService : BaseService, ICustomerService
     private async Task<IResult> SoftDeleteCustomerInternalAsync(Guid customerId)
     {
         //Check customer
-        var exists = await _customerRepo.ExistsAsync(c => c.Id == customerId && !c.IsDeleted);
+        var exists = await _customerRepo.ExistsAsync(c => c.Id == customerId);
         if (!exists)
             return new ErrorResult(Messages.CustomerNotFound);
 

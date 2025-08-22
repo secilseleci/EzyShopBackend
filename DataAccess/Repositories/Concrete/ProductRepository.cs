@@ -6,7 +6,6 @@ using Models.Entities.Concrete;
 using Models.ViewModels.Product;
 
 namespace DataAccess.Repositories.Concrete;
-
 public class ProductRepository(ApplicationDbContext context) : BaseRepository<Product>(context), IProductRepository
 {
     public async Task<ProductDetailsForSellerDto?> GetProductDetailsDtosForSellerAsync(Guid shopId, Guid productId)
@@ -81,6 +80,9 @@ public class ProductRepository(ApplicationDbContext context) : BaseRepository<Pr
                       join c in _dataContext.Categories on p.CategoryId equals c.Id
                       join s in _dataContext.Shops on p.ShopId equals s.Id
                       where p.Id == productId
+                        && !p.IsDeleted && p.IsActive && p.Stock > 0
+                        && !c.IsDeleted && c.IsActive
+                        && !s.IsDeleted && s.IsActive
                       select new ProductDetailsForCustomerDto
                       {
                           ProductId = p.Id,

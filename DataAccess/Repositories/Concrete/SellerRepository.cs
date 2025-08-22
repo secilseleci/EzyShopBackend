@@ -1,19 +1,12 @@
 ﻿using Core.Pagination;
 using DataAccess.Repositories.Abstract;
 using Microsoft.EntityFrameworkCore;
-using Models.DTOs.Customer;
 using Models.DTOs.Seller;
 using Models.Entities.Concrete;
 
 namespace DataAccess.Repositories.Concrete;
-
 public class SellerRepository(ApplicationDbContext context) : BaseRepository<Seller>(context), ISellerRepository
 {
-    public async Task<Seller?> GetActiveSellerByUserIdAsync(Guid userId)
-    {
-        var result = await GetWhereAsync(s => s.Id == userId && s.IsActive);      
-            return result?.FirstOrDefault();
-    }
     public async Task<PaginatedList<SellerListItemDto>> GetFilteredSellerListAsync(SellerFilterDto filter)
     {
         var query = from s in _dataContext.Sellers
@@ -90,5 +83,4 @@ public class SellerRepository(ApplicationDbContext context) : BaseRepository<Sel
 
         return result;
     }
-
 }

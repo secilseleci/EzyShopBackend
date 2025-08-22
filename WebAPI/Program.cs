@@ -1,8 +1,9 @@
-using WebAPI.Middlewares;
-using WebAPI.ExtensionMethods;
 using DataAccess;
 using DataAccess.SeedDatabase;
-using Microsoft.EntityFrameworkCore;   // eski adý buysa, namespace’i güncelle
+using Microsoft.EntityFrameworkCore;
+using Serilog;
+using WebAPI.ExtensionMethods;
+using WebAPI.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration
@@ -12,6 +13,14 @@ builder.Configuration
     .AddEnvironmentVariables();
 
 // ---------- 1) DI BLOKU ----------
+builder.Services.AddCors(p =>
+    p.AddPolicy("default", x => x
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .WithOrigins("https://localhost:5173") // geçici frontend politikasý
+        .AllowCredentials()
+    ));
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.ConfigureDbContext(builder.Configuration);
 builder.Services.ConfigureIdentity();
@@ -25,22 +34,29 @@ builder.Services.ConfigureJwtAuthentication(builder.Configuration);
 
 // ---------- 2) APP BLOKU ----------
 var app = builder.Build();
+app.UseCors("default");
 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
+else
+{
+    app.UseExceptionHandler("/error");
+    app.UseHsts();
+}
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.ConfigureLocalization();
+
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.UseSerilogRequestLogging();
 
 // ---------- 3) SEED + RUN ----------
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

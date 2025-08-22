@@ -12,9 +12,7 @@ using Models.Identity;
 using System.Text;
 using WebAPI.Services;
 
-
 namespace WebAPI.ExtensionMethods;
-
 public static class ServiceExtension
 {
     public static void ConfigureDbContext(this IServiceCollection services, IConfiguration configuration)

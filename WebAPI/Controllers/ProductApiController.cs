@@ -88,6 +88,7 @@ public class ProductApiController : BaseApiController
         return ApiResult(result);
     }
 
+    [AllowAnonymous]
     [HttpPost("list-public")]
     public async Task<IActionResult> GetListProduct([FromBody] ProductFilterViewModel model)
     {

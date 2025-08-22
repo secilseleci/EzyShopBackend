@@ -14,7 +14,6 @@ public class OrderItemRepository(ApplicationDbContext context) : BaseRepository<
                                     && oi.ProductId == productId
                                     && !oi.IsDeleted);  
     }
-
     public async Task<List<OrderItem>> GetByOrderIdAsync(Guid orderId, bool onlyActive = true)
     {
         var q = _dataContext.OrderItems
