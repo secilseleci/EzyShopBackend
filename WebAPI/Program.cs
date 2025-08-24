@@ -53,7 +53,6 @@ app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-app.UseSerilogRequestLogging();
 
 // ---------- 3) SEED + RUN ----------
 if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
