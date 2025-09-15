@@ -64,8 +64,8 @@
 
         #region Seller
         public const string InvalidStatus = "This user's status is not suitable for the action you are trying to perform.";
-        public const string SellerActivated = "Seller successfully activated.";
-        public const string SellerDeactivated = "Seller successfully deactivated.";
+        public const string SellerApproved = "Seller successfully approved.";
+        public const string SellerRejected= "Seller successfully rejected.";
         public const string SellerBanned = "Seller successfully banned.";
 
         #endregion

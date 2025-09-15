@@ -92,8 +92,8 @@ public class SellerService : BaseService, ISellerService
     }
     #endregion
 
-    #region Activate Seller
-    public async Task<IResult> ActivateSellerAsync(Guid sellerId)
+    #region Approve Seller
+    public async Task<IResult> ApproveSellerAsync(Guid sellerId)
     {
         //Login check
         if (!CurrentUserService.UserId.HasValue)
@@ -147,14 +147,14 @@ public class SellerService : BaseService, ISellerService
             //Transaction End
             await trx.CommitAsync();
 
-            return new SuccessResult(Messages.SellerActivated);
+            return new SuccessResult(Messages.SellerApproved);
 
         });
     }
     #endregion
 
-    #region Deactivate Seller
-    public async Task<IResult> DeactivateSellerAsync(Guid sellerId)
+    #region Reject Seller
+    public async Task<IResult> RejectSellerAsync(Guid sellerId)
     {
         //Login check
         if (!CurrentUserService.UserId.HasValue)
@@ -198,6 +198,9 @@ public class SellerService : BaseService, ISellerService
             if (user != null)
             {
                 user.IsDeleted = true;
+                user.LockoutEnabled = true; 
+                user.EmailConfirmed = false;
+                user.LockoutEnd = DateTimeOffset.MaxValue;
                 var updateResult = await _userManager.UpdateAsync(user);
                 if (!updateResult.Succeeded)
                     throw new Exception(Messages.DeleteError);
@@ -206,7 +209,7 @@ public class SellerService : BaseService, ISellerService
             //Transaction End
             await trx.CommitAsync();
 
-            return new SuccessResult(Messages.SellerDeactivated);
+            return new SuccessResult(Messages.SellerRejected);
 
         });
     }

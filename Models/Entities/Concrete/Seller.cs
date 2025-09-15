@@ -1,16 +1,18 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
 namespace Models.Entities.Concrete;
-
 public class Seller : BaseEntity
 {
+    [Required]
+    public Guid SubscriptionPlanId { get; set; }
+
     [Required]
     public string FirstName { get; set; } = null!;
 
     [Required]
     public string LastName { get; set; } = null!;
 
-    [Required] 
+    [Required]
     public string Phone { get; set; } = null!;
 
     public SellerStatus Status { get; set; } = SellerStatus.Pending;
@@ -21,5 +23,4 @@ public class Seller : BaseEntity
         Rejected = 2,
         Banned = 3
     }
-
 }

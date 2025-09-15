@@ -35,7 +35,7 @@ public class CartApiController : BaseApiController
 
     // Sepeti tamamen temizle
     [HttpDelete]
-    public async Task<IActionResult> ClearCart()
+    public async Task<IActionResult> RemoveCart()
     {
         var result = await _orderService.RemoveCartAsync();
         return ApiResult(result);

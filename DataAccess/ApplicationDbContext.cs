@@ -36,6 +36,7 @@ public class ApplicationDbContext(
     public DbSet<Shop> Shops { get; set; }
     public DbSet<Order> Orders { get; set; }
     public DbSet<OrderItem> OrderItems { get; set; }
+    public DbSet<SubscriptionPlan> SubscriptionPlans { get; set; }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

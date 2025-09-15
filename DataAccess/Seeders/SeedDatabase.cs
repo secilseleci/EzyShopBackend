@@ -21,6 +21,9 @@ public static class SeedDatabase
         // ✅ Users 
         await AppUserSeeder.SeedUsersAsync(dbContext, userManager);
 
+        // ✅ Subscription Plans
+        await SubscriptionPlanSeeder.SeedSubscriptionPlansAsync(dbContext);
+
         ////// ✅ Sellers  
         await SellerSeeder.SeedSellersAsync(dbContext);
 
@@ -29,7 +32,7 @@ public static class SeedDatabase
 
         ////// ✅ Customers  
         await CustomerSeeder.SeedCustomersAsync(dbContext);
-         
+
         //// ✅ Categories
         await CategorySeeder.SeedCategoriesAsync(dbContext);
 
@@ -39,6 +42,5 @@ public static class SeedDatabase
         // ✅ Orders
         //await OrderSeeder.SeedOrdersAsync(dbContext);
 
-         
     }
 }
