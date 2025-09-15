@@ -33,7 +33,7 @@ public class BaseRepository<T> : IBaseRepository<T> where T : class, IBaseEntity
     }
     public async Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate)
     {
-        return await _dbSet.AnyAsync(x => !x.IsDeleted && predicate.Compile()(x));
+        return await _dbSet.Where(x => !x.IsDeleted).AnyAsync(predicate);
     }
 
     public async Task<int> CreateAsync(T entity)

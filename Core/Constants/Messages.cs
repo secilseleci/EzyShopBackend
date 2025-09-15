@@ -22,6 +22,8 @@
         public const string ShopNotFound = "Shop not found";
         public const string OrderNotFound = "Order not found";
         public const string OrderItemNotFound = "OrderItem not found";
+        public const string SubscriptionPlanNotFound = "Subscription plan not found";
+
         #endregion
 
         #region Empty List

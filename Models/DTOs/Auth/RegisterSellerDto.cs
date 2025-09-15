@@ -5,6 +5,9 @@ namespace Models.DTOs.Auth;
 public class RegisterSellerDto
 {
     [Required]
+    public Guid SubscriptionPlanId { get; set; }
+
+    [Required]
     public string FullName { get; set; } = "N/A";
 
     [Required]

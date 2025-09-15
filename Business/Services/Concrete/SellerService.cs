@@ -56,6 +56,14 @@ public class SellerService : BaseService, ISellerService
         if (!shopExists.Success)
             return new ErrorDataResult<Seller>(shopExists.Message);
 
+        // Plan Existing Control
+        var planExists = await _context.SubscriptionPlans
+            .AnyAsync(p => p.Id == model.SubscriptionPlanId && p.IsActive);
+
+        if (!planExists)
+        {
+            return new ErrorDataResult<Seller>(Messages.SubscriptionPlanNotFound);  
+        }
 
         //Transaction Start
         var strategy = _context.Database.CreateExecutionStrategy();
@@ -347,6 +355,7 @@ public class SellerService : BaseService, ISellerService
         seller.Id = userId;
         seller.CreatedBy = model.FullName;
         seller.IsActive = false;
+        seller.SubscriptionPlanId = model.SubscriptionPlanId;
 
         var createSellerResult = await _sellerRepo.CreateAsync(seller);
 
