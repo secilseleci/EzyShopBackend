@@ -94,6 +94,7 @@ public static class ServiceExtension
         services.AddScoped<IShopRepository, ShopRepository>();
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<IOrderItemRepository, OrderItemRepository>();
+        services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
     }
     public static void ConfigureServiceRegistration(this IServiceCollection services)
     {
@@ -109,6 +110,7 @@ public static class ServiceExtension
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IShopService, ShopService>();
         services.AddScoped<IOrderService, OrderService>();
+        services.AddScoped<ISubscriptionPlanService, SubscriptionPlanService>();
     }
 }
 

@@ -3,6 +3,7 @@ using Models.DTOs.Auth;
 using Models.DTOs.Category;
 using Models.DTOs.Customer;
 using Models.DTOs.Product;
+using Models.DTOs.SubscriptionPlan;
 using Models.Entities.Concrete;
 
 namespace WebAPI.Mappings.AutoMapper;
@@ -63,6 +64,10 @@ public class MappingProfile : Profile
         #region Customer Search  
         CreateMap<Customer, CustomerSearchResultDto>()
             .ForMember(dest => dest.CustomerId, opt => opt.MapFrom(src => src.Id));
+        #endregion
+
+        #region SubscriptionPlan
+        CreateMap<SubscriptionPlan, CreateSubscriptionPlanDto>().ReverseMap();
         #endregion
 
     }
