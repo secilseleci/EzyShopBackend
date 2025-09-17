@@ -2,6 +2,8 @@
 
 public class SellerProfileDto
 {
+    public Guid SubscriptionPlanId { get; set; }
+    public string SubscriptionPlanName { get; set; } = null!;
     public Guid SellerId { get; set; }
     public string FirstName { get; set; } = null!;
     public string LastName { get; set; } = null!;

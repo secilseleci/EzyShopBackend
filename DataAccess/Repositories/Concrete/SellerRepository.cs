@@ -3,6 +3,7 @@ using DataAccess.Repositories.Abstract;
 using Microsoft.EntityFrameworkCore;
 using Models.DTOs.Seller;
 using Models.Entities.Concrete;
+using System.Numerics;
 
 namespace DataAccess.Repositories.Concrete;
 public class SellerRepository(ApplicationDbContext context) : BaseRepository<Seller>(context), ISellerRepository
@@ -63,9 +64,12 @@ public class SellerRepository(ApplicationDbContext context) : BaseRepository<Sel
         var result = await (from seller in _dataContext.Sellers
                             join user in _dataContext.Users on seller.Id equals user.Id
                             join shop in _dataContext.Shops on seller.Id equals shop.SellerId
+                            join plan in _dataContext.SubscriptionPlans on seller.SubscriptionPlanId equals plan.Id
                             where seller.Id == sellerId && !seller.IsDeleted
                             select new SellerProfileDto
                             {
+                                SubscriptionPlanId = seller.SubscriptionPlanId,
+                                SubscriptionPlanName = plan.Name,
                                 SellerId = seller.Id,
                                 FirstName = seller.FirstName,
                                 LastName = seller.LastName,
