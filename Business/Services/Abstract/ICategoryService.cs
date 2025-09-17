@@ -5,8 +5,9 @@ namespace Business.Services.Abstract;
 public interface ICategoryService
 {
     Task<IDataResult<CreateCategoryDto>> CreateCategoryAsync(CreateCategoryDto model);
-    Task<IResult> UpdateCategoryAsync(CategoryBasicDto model);
-    Task<IResult> DeleteCategoryAsync(Guid categoryId);
     Task<IDataResult<List<CategoryBasicDto>>> GetCategoriesAsync();
     Task<IDataResult<CategoryBasicDto>> GetCategoryByIdAsync(Guid categoryId);
+    Task<IDataResult<CategoryBasicDto>> UpdateCategoryAsync(CategoryBasicDto model);
+    Task<IResult> DeactivateCategoryAsync(Guid categoryId);
+    Task<IResult> ActivateCategoryAsync(Guid categoryId);
 }

@@ -4,7 +4,6 @@ using Core.Constants;
 using Core.Interfaces;
 using Core.Utilities.Results;
 using DataAccess.Repositories.Abstract;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Models.DTOs.SubscriptionPlan;
 using Models.Entities.Concrete;
@@ -19,7 +18,7 @@ public class SubscriptionPlanService : BaseService, ISubscriptionPlanService
         IMapper mapper,
         IConfiguration config,
         ICurrentUserService currentUserService) : base(mapper, config, currentUserService)
-        { _subscriptionPlanRepo = subscriptionPlanRepo; }
+    { _subscriptionPlanRepo = subscriptionPlanRepo; }
 
     public async Task<IDataResult<CreateSubscriptionPlanDto>> CreatePlanAsync(CreateSubscriptionPlanDto model)
     {
@@ -50,23 +49,8 @@ public class SubscriptionPlanService : BaseService, ISubscriptionPlanService
         // Return Dto
         return new SuccessDataResult<CreateSubscriptionPlanDto>(dto, Messages.CreateSuccess);
     }
-
-    public Task<IResult> DeactivatePlanAsync(Guid planId)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task<IDataResult<CreateSubscriptionPlanDto>> GetPlanByIdAsync(Guid id)
-    {
-        throw new NotImplementedException();
-    }
-
     public async Task<IDataResult<List<SubscriptionPlanDto>>> GetPlansAsync()
     {
-        // login check
-        if (!CurrentUserService.UserId.HasValue)
-            return new ErrorDataResult<List<SubscriptionPlanDto>>(Messages.LoginUnauthorized);
-
         IEnumerable<SubscriptionPlan> plans;
 
         if (CurrentUserService.Role == CustomRoles.Admin)
@@ -74,9 +58,10 @@ public class SubscriptionPlanService : BaseService, ISubscriptionPlanService
             // Admin  
             plans = await _subscriptionPlanRepo.GetAllAsync();
         }
+
         else
         {
-            // Seller  
+            // Seller & Customer & Guest
             plans = await _subscriptionPlanRepo.GetWhereAsync(p => p.IsActive);
         }
 
@@ -86,11 +71,113 @@ public class SubscriptionPlanService : BaseService, ISubscriptionPlanService
         var dtoList = Mapper.Map<List<SubscriptionPlanDto>>(plans.ToList());
         return new SuccessDataResult<List<SubscriptionPlanDto>>(dtoList);
     }
-
-
-    public Task<IDataResult<CreateSubscriptionPlanDto>> UpdatePlanAsync(Guid planId, CreateSubscriptionPlanDto model)
+    public async Task<IDataResult<SubscriptionPlanDto>> GetPlanByIdAsync(Guid planId)
     {
-        throw new NotImplementedException();
+        SubscriptionPlan? plan;
+
+        if (CurrentUserService.Role == CustomRoles.Admin)
+        {
+            // Admin 
+            plan = await _subscriptionPlanRepo.GetAsync(p => p.Id == planId);
+        }
+        else
+        {
+            // Seller & Customer & Guest
+            plan = await _subscriptionPlanRepo.GetAsync(p => p.Id == planId && p.IsActive);
+        }
+
+        if (plan == null)
+            return new ErrorDataResult<SubscriptionPlanDto>(Messages.SubscriptionPlanNotFound);
+
+        var dto = Mapper.Map<SubscriptionPlanDto>(plan);
+        return new SuccessDataResult<SubscriptionPlanDto>(dto);
+    }
+    public async Task<IDataResult<SubscriptionPlanDto>> UpdatePlanAsync(SubscriptionPlanDto model)
+    {
+        // Login check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorDataResult<SubscriptionPlanDto>(Messages.LoginUnauthorized);
+
+        // Role check
+        if (CurrentUserService.Role != CustomRoles.Admin)
+            return new ErrorDataResult<SubscriptionPlanDto>(Messages.UnauthorizedAccess);
+
+        // Category check
+        var existingPlan = await _subscriptionPlanRepo.GetByIdAsync(model.Id);
+        if (existingPlan == null || existingPlan.IsDeleted)
+            return new ErrorDataResult<SubscriptionPlanDto>(Messages.SubscriptionPlanNotFound);
+
+        // Duplicate check
+        var isNameTaken = await _subscriptionPlanRepo.ExistsAsync(sp =>
+            sp.Name.ToLower() == model.Name.ToLower() && sp.Id != model.Id);
+        if (isNameTaken)
+            return new ErrorDataResult<SubscriptionPlanDto>(Messages.AlreadyExists);
+
+        // Update fields
+        existingPlan.Name = model.Name;
+        existingPlan.Price = model.Price;
+        existingPlan.MaxProducts = model.MaxProducts;
+
+        var updateResult = await _subscriptionPlanRepo.UpdateAsync(existingPlan);
+
+        if (updateResult <= 0)
+            return new ErrorDataResult<SubscriptionPlanDto>(Messages.UpdateError);
+
+        // Map entity → dto
+        var dto = Mapper.Map<SubscriptionPlanDto>(existingPlan);
+        return new SuccessDataResult<SubscriptionPlanDto>(dto, Messages.UpdateSuccess);
+    }
+    public async Task<IResult> DeactivatePlanAsync(Guid planId)
+    {
+        // Login check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorResult(Messages.LoginUnauthorized);
+
+        // Role check
+        if (CurrentUserService.Role != CustomRoles.Admin)
+            return new ErrorResult(Messages.UnauthorizedAccess);
+
+        // Plan existing check
+        var existingPlan = await _subscriptionPlanRepo.GetByIdAsync(planId);
+        if (existingPlan == null || existingPlan.IsDeleted)
+            return new ErrorResult(Messages.SubscriptionPlanNotFound);
+
+        // Already deactive check
+        if (!existingPlan.IsActive)
+            return new ErrorResult(Messages.AlreadyDeactive);
+
+        existingPlan.IsActive = false;
+        var updateResult = await _subscriptionPlanRepo.UpdateAsync(existingPlan);
+
+        return updateResult > 0
+            ? new SuccessResult(Messages.UpdateSuccess)
+            : new ErrorResult(Messages.UpdateError);
+    }
+    public async Task<IResult> ActivatePlanAsync(Guid planId)
+    {
+        // Login check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorResult(Messages.LoginUnauthorized);
+
+        // Role check
+        if (CurrentUserService.Role != CustomRoles.Admin)
+            return new ErrorResult(Messages.UnauthorizedAccess);
+
+        // Plan existing check
+        var existingPlan = await _subscriptionPlanRepo.GetByIdAsync(planId);
+        if (existingPlan == null || existingPlan.IsDeleted)
+            return new ErrorResult(Messages.SubscriptionPlanNotFound);
+
+        // Already active check
+        if (existingPlan.IsActive)
+            return new ErrorResult(Messages.AlreadyActive);
+
+        existingPlan.IsActive = true;
+        var updateResult = await _subscriptionPlanRepo.UpdateAsync(existingPlan);
+
+        return updateResult > 0
+            ? new SuccessResult(Messages.UpdateSuccess)
+            : new ErrorResult(Messages.UpdateError);
     }
 }
 

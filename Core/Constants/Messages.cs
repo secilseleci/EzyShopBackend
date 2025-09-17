@@ -41,6 +41,12 @@
         public const string AlreadyExistsCustomer = "Customer is already exists";
         #endregion
 
+        #region  Active & Deactive
+        public const string AlreadyDeactive = "Entity is already deactive";
+        public const string AlreadyActive = "Entity is already active";
+
+        #endregion
+
         #region NoChanges
         public const string NoChangesDetected = "You haven't made any changes";
         #endregion

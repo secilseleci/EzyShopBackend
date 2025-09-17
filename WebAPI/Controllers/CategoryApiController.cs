@@ -37,19 +37,27 @@ public class CategoryApiController : BaseApiController
         return ApiResult(result);
     }
 
-    [HttpDelete]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Delete([FromBody] Guid id)
-    {
-        var result = await _categoryService.DeleteCategoryAsync(id);
-        return ApiResult(result);
-    }
-
     [HttpPut]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update([FromBody] CategoryBasicDto model)
     {
         var result = await _categoryService.UpdateCategoryAsync(model);
+        return ApiResult(result);
+    }
+
+    [HttpPatch("{id}/deactivate")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Deactivate([FromRoute] Guid id)
+    {
+        var result = await _categoryService.DeactivateCategoryAsync(id);
+        return ApiResult(result);
+    }
+
+    [HttpPatch("{id}/activate")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Activate([FromRoute] Guid id)
+    {
+        var result = await _categoryService.ActivateCategoryAsync(id);
         return ApiResult(result);
     }
 }

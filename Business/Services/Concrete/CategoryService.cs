@@ -7,7 +7,6 @@ using DataAccess.Repositories.Abstract;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Models.DTOs.Category;
-using Models.DTOs.SubscriptionPlan;
 using Models.Entities.Concrete;
 using Models.Identity;
 
@@ -57,10 +56,6 @@ public class CategoryService : BaseService, ICategoryService
 
     public async Task<IDataResult<List<CategoryBasicDto>>> GetCategoriesAsync()
     {
-        // login check
-        if (!CurrentUserService.UserId.HasValue)
-            return new ErrorDataResult<List<CategoryBasicDto>>(Messages.LoginUnauthorized);
-
         IEnumerable<Category> categories;
 
         if (CurrentUserService.Role == CustomRoles.Admin)
@@ -70,8 +65,8 @@ public class CategoryService : BaseService, ICategoryService
         }
         else
         {
-            // Seller & Customer
-            categories = await _categoryRepo.GetWhereAsync(p => p.IsActive);
+            // Seller & Customer & Guest
+            categories = await _categoryRepo.GetWhereAsync(c =>c.IsActive);
         }
 
         if (!categories.Any())
@@ -81,23 +76,84 @@ public class CategoryService : BaseService, ICategoryService
         return new SuccessDataResult<List<CategoryBasicDto>>(dtoList);
     }
 
-    public async Task<IResult> UpdateCategoryAsync(CategoryBasicDto model)
+    public async Task<IDataResult<CategoryBasicDto>> GetCategoryByIdAsync(Guid categoryId)
     {
+        Category? category;
+
+        if (CurrentUserService.Role == CustomRoles.Admin)
+        {
+            // Admin 
+            category = await _categoryRepo.GetAsync(c => c.Id == categoryId);
+        }
+        else
+        {
+            // Seller & Customer & Guest
+            category = await _categoryRepo.GetAsync(c =>c.Id == categoryId && c.IsActive);
+        }
+
+        if (category == null)
+            return new ErrorDataResult<CategoryBasicDto>(Messages.CategoryNotFound);
+
+        var dto = Mapper.Map<CategoryBasicDto>(category);
+
+        return new SuccessDataResult<CategoryBasicDto>(dto);
+    }
+
+    public async Task<IDataResult<CategoryBasicDto>> UpdateCategoryAsync(CategoryBasicDto model)
+    {
+        // Login check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorDataResult<CategoryBasicDto>(Messages.LoginUnauthorized);
+
+        // Role check
+        if (CurrentUserService.Role != CustomRoles.Admin)
+            return new ErrorDataResult<CategoryBasicDto>(Messages.UnauthorizedAccess);
+
+        // Category check
         var existingCategory = await _categoryRepo.GetByIdAsync(model.Id);
-
         if (existingCategory == null || existingCategory.IsDeleted)
-            return new ErrorResult(Messages.CategoryNotFound);
+            return new ErrorDataResult<CategoryBasicDto>(Messages.CategoryNotFound);
 
+        // Duplicate check
         var isNameTaken = await _categoryRepo.ExistsAsync(c =>
-        c.Name.ToLower() == model.Name.ToLower() &&
-        c.Id != model.Id);
-
+            c.Name.ToLower() == model.Name.ToLower() && c.Id != model.Id);
         if (isNameTaken)
-            return new ErrorResult(Messages.AlreadyExists);
+            return new ErrorDataResult<CategoryBasicDto>(Messages.AlreadyExists);
 
+        // Update fields
         existingCategory.Name = model.Name;
         existingCategory.ImageUrl = model.ImageUrl;
 
+        var updateResult = await _categoryRepo.UpdateAsync(existingCategory);
+
+        if (updateResult <= 0)
+            return new ErrorDataResult<CategoryBasicDto>(Messages.UpdateError);
+
+        // Map entity → dto
+        var dto = Mapper.Map<CategoryBasicDto>(existingCategory);
+        return new SuccessDataResult<CategoryBasicDto>(dto, Messages.UpdateSuccess);
+    }
+
+    public async Task<IResult> DeactivateCategoryAsync(Guid categoryId)
+    {
+        // Login check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorResult(Messages.LoginUnauthorized);
+
+        // Role check
+        if (CurrentUserService.Role != CustomRoles.Admin)
+            return new ErrorResult(Messages.UnauthorizedAccess);
+
+        // Category existing check
+        var existingCategory = await _categoryRepo.GetByIdAsync(categoryId);
+        if (existingCategory == null || existingCategory.IsDeleted)
+            return new ErrorResult(Messages.CategoryNotFound);
+
+        // Already deactive check
+        if (!existingCategory.IsActive)
+            return new ErrorResult(Messages.AlreadyDeactive);
+
+        existingCategory.IsActive = false;
         var updateResult = await _categoryRepo.UpdateAsync(existingCategory);
 
         return updateResult > 0
@@ -105,26 +161,30 @@ public class CategoryService : BaseService, ICategoryService
             : new ErrorResult(Messages.UpdateError);
     }
 
-    public async Task<IResult> DeleteCategoryAsync(Guid categoryId)
+    public async Task<IResult> ActivateCategoryAsync(Guid categoryId)
     {
-        if (!await _categoryRepo.ExistsAsync(c => c.Id == categoryId))
+        // Login check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorResult(Messages.LoginUnauthorized);
+
+        // Role check
+        if (CurrentUserService.Role != CustomRoles.Admin)
+            return new ErrorResult(Messages.UnauthorizedAccess);
+
+        // Category existing check
+        var existingCategory = await _categoryRepo.GetByIdAsync(categoryId);
+        if (existingCategory == null || existingCategory.IsDeleted)
             return new ErrorResult(Messages.CategoryNotFound);
 
-        var deleteResult = await _categoryRepo.SoftDeleteAsync(categoryId);
+        // Already active check
+        if (existingCategory.IsActive)
+            return new ErrorResult(Messages.AlreadyActive);
 
-        return deleteResult > 0
-            ? new SuccessResult(Messages.DeleteSuccess)
-            : new ErrorResult(Messages.DeleteError);
-    }
+        existingCategory.IsActive = true;
+        var updateResult = await _categoryRepo.UpdateAsync(existingCategory);
 
-    public async Task<IDataResult<CategoryBasicDto>> GetCategoryByIdAsync(Guid categoryId)
-    {
-        var category = await _categoryRepo.GetByIdAsync(categoryId);
-        if (category == null)
-            return new ErrorDataResult<CategoryBasicDto>(Messages.CategoryNotFound);
-
-        var dto = Mapper.Map<CategoryBasicDto>(category);
-
-        return new SuccessDataResult<CategoryBasicDto>(dto);
+        return updateResult > 0
+            ? new SuccessResult(Messages.UpdateSuccess)
+            : new ErrorResult(Messages.UpdateError);
     }
 }
