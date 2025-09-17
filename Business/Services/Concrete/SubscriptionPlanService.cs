@@ -61,10 +61,32 @@ public class SubscriptionPlanService : BaseService, ISubscriptionPlanService
         throw new NotImplementedException();
     }
 
-    public Task<IDataResult<List<CreateSubscriptionPlanDto>>> GetPlansAsync(bool includePassive = false)
+    public async Task<IDataResult<List<SubscriptionPlanDto>>> GetPlansAsync()
     {
-        throw new NotImplementedException();
+        // login check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorDataResult<List<SubscriptionPlanDto>>(Messages.LoginUnauthorized);
+
+        IEnumerable<SubscriptionPlan> plans;
+
+        if (CurrentUserService.Role == CustomRoles.Admin)
+        {
+            // Admin  
+            plans = await _subscriptionPlanRepo.GetAllAsync();
+        }
+        else
+        {
+            // Seller  
+            plans = await _subscriptionPlanRepo.GetWhereAsync(p => p.IsActive);
+        }
+
+        if (!plans.Any())
+            return new ErrorDataResult<List<SubscriptionPlanDto>>(Messages.EmptyEntityList);
+
+        var dtoList = Mapper.Map<List<SubscriptionPlanDto>>(plans.ToList());
+        return new SuccessDataResult<List<SubscriptionPlanDto>>(dtoList);
     }
+
 
     public Task<IDataResult<CreateSubscriptionPlanDto>> UpdatePlanAsync(Guid planId, CreateSubscriptionPlanDto model)
     {

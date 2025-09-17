@@ -1,14 +1,15 @@
 ﻿using AutoMapper;
 using Business.Services.Abstract;
+using Core.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Models.DTOs.SubscriptionPlan;
+using WebAPI.Services;
 
 namespace WebAPI.Controllers;
 
 [ApiController]
 [Route("api/subscriptionPlan")]
-[Authorize(Roles = "Admin")]
 public class SubscriptionPlanApiController : BaseApiController
 {
     private readonly ISubscriptionPlanService _subscriptionPlanService;
@@ -17,7 +18,16 @@ public class SubscriptionPlanApiController : BaseApiController
         _subscriptionPlanService = subscriptionPlanService;
     }
 
-    [HttpPost("plans")]
+    [HttpGet]
+    [Authorize]  
+    public async Task<IActionResult> GetPlans()
+    {
+        var result = await _subscriptionPlanService.GetPlansAsync();
+        return ApiResult(result);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost]
     public async Task<IActionResult> AddPlan([FromBody] CreateSubscriptionPlanDto model)
     {
         var result = await _subscriptionPlanService.CreatePlanAsync(model);

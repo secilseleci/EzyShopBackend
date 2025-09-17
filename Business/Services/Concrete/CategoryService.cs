@@ -7,6 +7,7 @@ using DataAccess.Repositories.Abstract;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Models.DTOs.Category;
+using Models.DTOs.SubscriptionPlan;
 using Models.Entities.Concrete;
 using Models.Identity;
 
@@ -26,15 +27,58 @@ public class CategoryService : BaseService, ICategoryService
         _categoryRepo = categoryRepo;
     }
 
-    public async Task<IResult> CreateCategoryAsync(CategoryBasicDto model)
+    public async Task<IDataResult<CreateCategoryDto>> CreateCategoryAsync(CreateCategoryDto model)
     {
-        if (await _categoryRepo.ExistsAsync(c => c.Name.ToLower() == model.Name.ToLower()))
-            return new ErrorResult(Messages.AlreadyExists);
+        // Login check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorDataResult<CreateCategoryDto>(Messages.LoginUnauthorized);
 
-        var createResult = await _categoryRepo.CreateAsync(Mapper.Map<Category>(model));
-        return createResult > 0
-            ? new SuccessResult(Messages.CreateSuccess)
-            : new ErrorResult(Messages.CreateError);
+        // Role check
+        if (CurrentUserService.Role != CustomRoles.Admin)
+            return new ErrorDataResult<CreateCategoryDto>(Messages.UnauthorizedAccess);
+
+        // Duplicate check
+        if (await _categoryRepo.ExistsAsync(c => c.Name.ToLower() == model.Name.ToLower()))
+            return new ErrorDataResult<CreateCategoryDto>(Messages.AlreadyExists);
+
+        // DTO → Entity
+        var entity = Mapper.Map<Category>(model);
+
+        // Save
+        var createResult = await _categoryRepo.CreateAsync(entity);
+        if (createResult <= 0)
+            return new ErrorDataResult<CreateCategoryDto>(Messages.CreateError);
+
+        // Entity → DTO
+        var dto = Mapper.Map<CreateCategoryDto>(entity);
+
+        return new SuccessDataResult<CreateCategoryDto>(dto, Messages.CreateSuccess);
+    }
+
+    public async Task<IDataResult<List<CategoryBasicDto>>> GetCategoriesAsync()
+    {
+        // login check
+        if (!CurrentUserService.UserId.HasValue)
+            return new ErrorDataResult<List<CategoryBasicDto>>(Messages.LoginUnauthorized);
+
+        IEnumerable<Category> categories;
+
+        if (CurrentUserService.Role == CustomRoles.Admin)
+        {
+            // Admin  
+            categories = await _categoryRepo.GetAllAsync();
+        }
+        else
+        {
+            // Seller & Customer
+            categories = await _categoryRepo.GetWhereAsync(p => p.IsActive);
+        }
+
+        if (!categories.Any())
+            return new ErrorDataResult<List<CategoryBasicDto>>(Messages.EmptyEntityList);
+
+        var dtoList = Mapper.Map<List<CategoryBasicDto>>(categories.ToList());
+        return new SuccessDataResult<List<CategoryBasicDto>>(dtoList);
     }
 
     public async Task<IResult> UpdateCategoryAsync(CategoryBasicDto model)
@@ -71,18 +115,6 @@ public class CategoryService : BaseService, ICategoryService
         return deleteResult > 0
             ? new SuccessResult(Messages.DeleteSuccess)
             : new ErrorResult(Messages.DeleteError);
-    }
-
-    public async Task<IDataResult<IEnumerable<CategoryBasicDto>>> GetAllCategoriesAsync()
-    {
-        var categories = await _categoryRepo.GetAllAsync();
-
-        if (!categories.Any())
-            return new ErrorDataResult<IEnumerable<CategoryBasicDto>>(Messages.EmptyEntityList);
-
-        var dtos = Mapper.Map<IEnumerable<CategoryBasicDto>>(categories);
-
-        return new SuccessDataResult<IEnumerable<CategoryBasicDto>>(dtos);
     }
 
     public async Task<IDataResult<CategoryBasicDto>> GetCategoryByIdAsync(Guid categoryId)

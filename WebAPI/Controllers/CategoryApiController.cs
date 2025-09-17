@@ -18,7 +18,7 @@ public class CategoryApiController : BaseApiController
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var result = await _categoryService.GetAllCategoriesAsync();
+        var result = await _categoryService.GetCategoriesAsync();
         return ApiResult(result);
     }
 
@@ -31,7 +31,7 @@ public class CategoryApiController : BaseApiController
 
     [HttpPost]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Add([FromBody] CategoryBasicDto model)
+    public async Task<IActionResult> Add([FromBody] CreateCategoryDto model)
     {
         var result = await _categoryService.CreateCategoryAsync(model);
         return ApiResult(result);

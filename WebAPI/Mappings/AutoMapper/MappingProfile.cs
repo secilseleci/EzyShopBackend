@@ -51,7 +51,23 @@ public class MappingProfile : Profile
         #region Category
         CreateMap<Category, CategoryBasicDto>()
         .ForMember(dest => dest.Name, opt => opt.MapFrom(src => (src.Name ?? string.Empty).Trim())).ReverseMap();
+
+        CreateMap<Category, CreateCategoryDto>()
+       .ForMember(dest => dest.Name, opt => opt.MapFrom(src => (src.Name ?? string.Empty).Trim())).ReverseMap();
         #endregion
+
+
+        #region SubscriptionPlan
+        CreateMap<SubscriptionPlan, SubscriptionPlanDto>()
+            .ForMember(dest => dest.Name, opt => opt.MapFrom(src => (src.Name ?? string.Empty).Trim()))
+            .ReverseMap();
+
+        CreateMap<SubscriptionPlan, CreateSubscriptionPlanDto>()
+            .ForMember(dest => dest.Name, opt => opt.MapFrom(src => (src.Name ?? string.Empty).Trim()))
+            .ReverseMap();
+        #endregion
+
+
 
         #region Product 
         CreateMap<Product, ProductBasicDto>().ReverseMap();
@@ -65,10 +81,5 @@ public class MappingProfile : Profile
         CreateMap<Customer, CustomerSearchResultDto>()
             .ForMember(dest => dest.CustomerId, opt => opt.MapFrom(src => src.Id));
         #endregion
-
-        #region SubscriptionPlan
-        CreateMap<SubscriptionPlan, CreateSubscriptionPlanDto>().ReverseMap();
-        #endregion
-
     }
 }
